@@ -151,7 +151,8 @@ oar_t *oar_create(const oar_config_t *config) {
 
   oar->limiter =
       oar_limiter_create(config->sampling_rate, def_limiter_release_ms,
-                         def_limiter_threshold_dbfs);
+                         def_limiter_threshold_dbfs,
+                         config->samples_per_channel);
   if (!oar->limiter) {
     oar_destroy(oar);
     return 0;
@@ -590,6 +591,11 @@ int oar_enable_limiter(oar_t *oar, int enable) {
   if (!oar) return ck_oar_error_inval;
   oar->enable_limiter = enable ? 1 : 0;
   return ck_oar_ok;
+}
+
+double oar_get_limiter_env(const oar_t *oar) {
+  if (!oar || !oar->limiter) return 1.0;
+  return oar->limiter->env;
 }
 
 int oar_enable_head_tracking(oar_t *oar, int enable) {

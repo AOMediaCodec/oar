@@ -20,11 +20,21 @@
 #include "definitions.h"
 
 oar_limiter_t* oar_limiter_create(int sampling_rate, double release_ms,
-                                  double ceiling_db) {
-  if (sampling_rate <= 0 || release_ms <= 0) return 0;
+                                  double ceiling_db, uint32_t max_frames) {
+  if (sampling_rate <= 0 || release_ms <= 0 || max_frames == 0) return 0;
 
   oar_limiter_t* limiter = def_mallocz(oar_limiter_t, 1);
   if (!limiter) return 0;
+
+  limiter->max_samples = (float*)calloc(max_frames, sizeof(float));
+  limiter->limiter_env = (float*)calloc(max_frames, sizeof(float));
+  if (!limiter->max_samples || !limiter->limiter_env) {
+    free(limiter->max_samples);
+    free(limiter->limiter_env);
+    def_free(limiter);
+    return 0;
+  }
+  limiter->capacity = max_frames;
 
   limiter->sampling_rate = sampling_rate;
   limiter->ceiling = pow(10.0, ceiling_db / 20.0);
@@ -35,11 +45,17 @@ oar_limiter_t* oar_limiter_create(int sampling_rate, double release_ms,
   return limiter;
 }
 
-void oar_limiter_destroy(oar_limiter_t* limiter) { def_free(limiter); }
+void oar_limiter_destroy(oar_limiter_t* limiter) {
+  if (limiter) {
+    free(limiter->max_samples);
+    free(limiter->limiter_env);
+  }
+  def_free(limiter);
+}
 
 static double GetMaximumRequiredGain(const oar_limiter_t* limiter,
                                      double sample) {
-  if (!limiter) return 1.0;  // Should not happen if called from Process
+  if (!limiter) return 1.0;
   return fabs(sample) > limiter->ceiling ? limiter->ceiling / fabs(sample)
                                          : 1.0;
 }
@@ -51,15 +67,12 @@ int oar_limiter_process(oar_limiter_t* limiter, oar_audio_block_t* block) {
   uint32_t num_frames = block->samples_per_channel;
 
   if (num_channels == 0 || num_frames == 0) return ck_oar_error_inval;
+  if (num_frames > limiter->capacity) return ck_oar_error_inval;
 
-  float* max_samples = def_mallocz(float, num_frames);
-  float* limiter_env = def_mallocz(float, num_frames);
+  float* max_samples = limiter->max_samples;
+  float* limiter_env = limiter->limiter_env;
 
-  if (!max_samples || !limiter_env) {
-    def_free(max_samples);
-    def_free(limiter_env);
-    return ck_oar_error_nomem;
-  }
+  memset(max_samples, 0, sizeof(float) * num_frames);
 
   for (uint32_t c = 0; c < num_channels; ++c) {
     const float* channel_data = block->data + (c * num_frames);
@@ -90,7 +103,5 @@ int oar_limiter_process(oar_limiter_t* limiter, oar_audio_block_t* block) {
     }
   }
 
-  free(max_samples);
-  free(limiter_env);
   return ck_oar_ok;
 }

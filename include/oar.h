@@ -271,6 +271,17 @@ int oar_set_loudness(oar_t *oar, uint32_t gid, float loudness,
 int oar_enable_limiter(oar_t *oar, int enable);
 
 /**
+ * @brief     Get the current limiter envelope value.
+ *
+ * Returns the limiter gain multiplier after the most recent oar_render() call.
+ * 1.0 means no gain reduction; values below 1.0 indicate active limiting.
+ *
+ * @param     [in] oar : OAR object
+ * @return    Limiter envelope (0..1], or 1.0 if limiter is NULL/disabled.
+ */
+double oar_get_limiter_env(const oar_t *oar);
+
+/**
  * @brief     Enable or disable head tracking for all audio elements.
  *
  * When enabled, OAR will accept head-orientation data (as quaternions via

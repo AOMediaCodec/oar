@@ -22,6 +22,8 @@
 #ifndef _OAR_LIMITER_H_
 #define _OAR_LIMITER_H_
 
+#include <stdint.h>
+
 #include "oar_base.h"  // For oar_audio_block_t
 
 #ifdef __cplusplus
@@ -34,6 +36,9 @@ typedef struct OarLimiter {
   double ceiling;
   double release_time_constant;
   double env;
+  float* max_samples;   /**< Pre-allocated per-frame peak buffer. */
+  float* limiter_env;   /**< Pre-allocated per-frame envelope buffer. */
+  uint32_t capacity;    /**< Max frames the buffers can hold. */
 } oar_limiter_t;
 
 /*!\brief Constructor for oar_limiter_t.
@@ -41,11 +46,12 @@ typedef struct OarLimiter {
  * \param sampling_rate Sampling rate of the audio data.
  * \param release_ms Release time in milliseconds.
  * \param ceiling_db Ceiling level in decibels.
+ * \param max_frames Maximum number of frames per process call.
  * \return A pointer to the newly created oar_limiter_t instance, or NULL on
  * failure.
  */
 oar_limiter_t* oar_limiter_create(int sampling_rate, double release_ms,
-                                  double ceiling_db);
+                                  double ceiling_db, uint32_t max_frames);
 
 /*!\brief Destructor for oar_limiter_t.
  *
