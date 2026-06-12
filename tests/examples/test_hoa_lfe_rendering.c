@@ -144,7 +144,7 @@ int main() {
          kProbeToneHz, rms_44k, rms_48k, rms_96k);
 
   // The LFE level must be invariant to the output sampling rate. With the
-  // hardcoded-48k bug, the 96 kHz ratio is ~2.4x.
+  // hardcoded-48k bug, the measured 96 kHz ratio is 2.697x.
   const double ratio_96k = rms_96k / rms_48k;
   const double ratio_44k = rms_44k / rms_48k;
   if (fabs(ratio_96k - 1.0) > 0.05 || fabs(ratio_44k - 1.0) > 0.05) {
