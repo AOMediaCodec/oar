@@ -269,9 +269,14 @@ void Resampler::GenerateInterpolatingFilter(int sample_rate) {
                      filter_length, filter_channel);
 
   // Pad out the filter length so that it can be arranged in polyphase fashion.
+  // The polyphase decomposition has |up_rate_| branches, so the per-branch
+  // length must be derived from |up_rate_|. Deriving it from |max_rate| (as
+  // previously done) silently dropped the tail of the filter whenever
+  // down_rate_ > up_rate_, causing rate-dependent gain errors (e.g. -2.5 dB at
+  // 96k->48k, -35 dB at 192k->48k) and degraded anti-aliasing.
   const size_t transposed_length =
-      filter_length + max_rate - (filter_length % max_rate);
-  coeffs_per_phase_ = transposed_length / max_rate;
+      filter_length + up_rate_ - (filter_length % up_rate_);
+  coeffs_per_phase_ = transposed_length / up_rate_;
   ArrangeFilterAsPolyphase(filter_length, *filter_channel);
 }
 

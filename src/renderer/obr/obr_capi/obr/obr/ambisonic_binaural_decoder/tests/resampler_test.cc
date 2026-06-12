@@ -12,6 +12,7 @@
 
 #include "obr/ambisonic_binaural_decoder/resampler.h"
 
+#include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
@@ -111,6 +112,51 @@ TEST(ResamplerTest, DownSampleTest) {
   const int num_expected_zero_crossings =
       4 * kToneFrequency / (kSourceDataSampleRate / kInputBufferLength);
   EXPECT_EQ(num_expected_zero_crossings, zero_cross_count);
+}
+
+// Regression test: the polyphase decomposition previously derived its
+// per-branch length from max(up_rate_, down_rate_) although the decomposition
+// has up_rate_ branches. Whenever down_rate_ > up_rate_ this silently dropped
+// the tail of the interpolation filter, causing rate-pair-dependent gain
+// errors (-2.5 dB at 96k->48k, -35 dB at 192k->48k, -41 dB at 176.4k->48k)
+// and degraded anti-aliasing. A unit-amplitude passband tone must come out at
+// unit amplitude for every supported rate pair.
+TEST(ResamplerTest, PassbandGainIsUnityAcrossRatePairs) {
+  const std::pair<int, int> kRatePairs[] = {
+      {44100, 48000},  {48000, 44100},  {88200, 48000}, {96000, 48000},
+      {176400, 48000}, {192000, 48000}, {48000, 96000}};
+  for (const auto& rates : kRatePairs) {
+    const int source_rate = rates.first;
+    const int destination_rate = rates.second;
+    ASSERT_TRUE(
+        Resampler::AreSampleRatesSupported(source_rate, destination_rate));
+
+    // 100 ms of a unit-amplitude tone well inside every passband.
+    const size_t input_length = static_cast<size_t>(source_rate / 10);
+    AudioBuffer input(kNumMonoChannels, input_length);
+    GenerateSineWave(kToneFrequency, source_rate, &input[0]);
+
+    Resampler resampler;
+    resampler.SetRateAndNumChannels(source_rate, destination_rate,
+                                    kNumMonoChannels);
+    AudioBuffer output(kNumMonoChannels,
+                       resampler.GetNextOutputLength(input_length));
+    resampler.Process(input, &output);
+
+    // Amplitude from the RMS of the middle half of the output, which skips
+    // the filter warm-up and tail transients.
+    const size_t begin = output.num_frames() / 4;
+    const size_t end = 3 * output.num_frames() / 4;
+    double sum_squares = 0.0;
+    for (size_t i = begin; i < end; ++i) {
+      sum_squares += static_cast<double>(output[0][i]) * output[0][i];
+    }
+    const double amplitude =
+        std::sqrt(2.0 * sum_squares / static_cast<double>(end - begin));
+    // +-0.012 is roughly +-0.1 dB.
+    EXPECT_NEAR(1.0, amplitude, 0.012)
+        << "gain error for " << source_rate << " -> " << destination_rate;
+  }
 }
 
 TEST(ResamplerTest, ResetStateTest) {
