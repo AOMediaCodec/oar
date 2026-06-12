@@ -33,3 +33,14 @@ if(NOT MSVC)
   target_link_libraries(test_scene_based_rendering PRIVATE m)
   target_link_libraries(test_object_based_rendering PRIVATE m)
 endif()
+
+# The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
+# into the library when OAR_ENABLE_HOA_LFE is ON.
+if(OAR_ENABLE_HOA_LFE)
+    add_executable(test_hoa_lfe_rendering test_hoa_lfe_rendering.c)
+    target_link_libraries(test_hoa_lfe_rendering PRIVATE oar)
+    if(NOT MSVC)
+        target_link_libraries(test_hoa_lfe_rendering PRIVATE m)
+    endif()
+    set_property(TARGET test_hoa_lfe_rendering PROPERTY C_STANDARD 99)
+endif()

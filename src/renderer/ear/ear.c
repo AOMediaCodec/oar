@@ -273,7 +273,7 @@ static int _open(renderer_library_context_t *ctx) {
         &hin, ear_renderer->out_sp_layout.sp_layout.predefined_sp,
         &ear_renderer->hmm);
 
-    if (hin.lfe_on && out_info && out_info->lfe1) {
+    if (hin.lfe_on && pout.lfe1 >= 0) {
       lfe_filter_t *plfe = &ear_renderer->out_sp_layout.lfe_f;
       if (plfe->init == 0) lfefilter_init(plfe, 120, ctx->sample_rate);
     }
@@ -304,7 +304,8 @@ static int _render(renderer_library_context_t *ctx, const oar_audio_block_t *in,
     }
   } else {
     IAMF_element_renderer_render_H2M(&ear_renderer->hmm, fin, fout, num_samples,
-                                     &ear_renderer->out_sp_layout.lfe_f);
+                                     &ear_renderer->out_sp_layout.lfe_f,
+                                     ctx->sample_rate);
   }
 
   return ck_oar_ok;
