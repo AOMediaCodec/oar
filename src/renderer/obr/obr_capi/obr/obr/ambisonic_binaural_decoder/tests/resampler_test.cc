@@ -159,6 +159,46 @@ TEST(ResamplerTest, PassbandGainIsUnityAcrossRatePairs) {
   }
 }
 
+// The truncated filter tail also degraded anti-aliasing when downsampling: a
+// tone above the destination Nyquist frequency must be strongly attenuated,
+// not folded back into the output band.
+TEST(ResamplerTest, DownsamplingAttenuatesAboveDestinationNyquist) {
+  // {source_rate, destination_rate, tone_frequency}; each tone sits at 1.5x
+  // the destination Nyquist frequency.
+  const int kCases[][3] = {
+      {96000, 48000, 36000}, {192000, 48000, 72000}, {88200, 44100, 33000}};
+  for (const auto& test_case : kCases) {
+    const int source_rate = test_case[0];
+    const int destination_rate = test_case[1];
+    const int tone_frequency = test_case[2];
+
+    const size_t input_length = static_cast<size_t>(source_rate / 10);
+    AudioBuffer input(kNumMonoChannels, input_length);
+    GenerateSineWave(static_cast<float>(tone_frequency), source_rate,
+                     &input[0]);
+
+    Resampler resampler;
+    resampler.SetRateAndNumChannels(source_rate, destination_rate,
+                                    kNumMonoChannels);
+    AudioBuffer output(kNumMonoChannels,
+                       resampler.GetNextOutputLength(input_length));
+    resampler.Process(input, &output);
+
+    const size_t begin = output.num_frames() / 4;
+    const size_t end = 3 * output.num_frames() / 4;
+    double sum_squares = 0.0;
+    for (size_t i = begin; i < end; ++i) {
+      sum_squares += static_cast<double>(output[0][i]) * output[0][i];
+    }
+    const double amplitude =
+        std::sqrt(2.0 * sum_squares / static_cast<double>(end - begin));
+    // 0.02 is roughly -34 dB.
+    EXPECT_LT(amplitude, 0.02) << "aliasing for " << tone_frequency
+                               << " Hz tone, " << source_rate << " -> "
+                               << destination_rate;
+  }
+}
+
 TEST(ResamplerTest, ResetStateTest) {
   // Create input buffer with 1000Hz sine wave at 44100Hz, 441 samples long.
   // This should be ten periods of a sine wave.
