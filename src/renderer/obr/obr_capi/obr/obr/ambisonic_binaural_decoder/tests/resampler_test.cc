@@ -12,12 +12,14 @@
 
 #include "obr/ambisonic_binaural_decoder/resampler.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
 #include <numeric>
 #include <utility>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "obr/audio_buffer/audio_buffer.h"
@@ -196,6 +198,67 @@ TEST(ResamplerTest, DownsamplingAttenuatesAboveDestinationNyquist) {
     EXPECT_LT(amplitude, 0.02) << "aliasing for " << tone_frequency
                                << " Hz tone, " << source_rate << " -> "
                                << destination_rate;
+  }
+}
+
+// The partition fix changed coeffs_per_phase_, which determines the size of
+// the streaming state_ buffer carried between Process() calls. Feeding the
+// signal in blocks (including blocks shorter than the state buffer) must
+// produce exactly the same samples as processing it in one shot.
+TEST(ResamplerTest, ChunkedProcessingMatchesOneShot) {
+  const struct {
+    int source_rate;
+    int destination_rate;
+    size_t chunk_size;
+  } kCases[] = {{96000, 48000, 16},  // Chunk shorter than the state buffer.
+                {48000, 96000, 8},   // Ditto, upsampling.
+                {192000, 48000, 160},
+                {44100, 48000, 63},
+                {48000, 44100, 441},
+                {48000, 96000, 100}};
+  for (const auto& test_case : kCases) {
+    const size_t input_length = 4410;
+    AudioBuffer input(kNumMonoChannels, input_length);
+    GenerateSineWave(kToneFrequency, test_case.source_rate, &input[0]);
+
+    Resampler one_shot;
+    one_shot.SetRateAndNumChannels(test_case.source_rate,
+                                   test_case.destination_rate,
+                                   kNumMonoChannels);
+    AudioBuffer one_shot_output(kNumMonoChannels,
+                                one_shot.GetNextOutputLength(input_length));
+    one_shot.Process(input, &one_shot_output);
+
+    Resampler chunked;
+    chunked.SetRateAndNumChannels(test_case.source_rate,
+                                  test_case.destination_rate,
+                                  kNumMonoChannels);
+    std::vector<float> chunked_output;
+    size_t offset = 0;
+    while (offset < input_length) {
+      const size_t this_chunk =
+          std::min(test_case.chunk_size, input_length - offset);
+      AudioBuffer chunk(kNumMonoChannels, this_chunk);
+      std::copy_n(input[0].begin() + offset, this_chunk, chunk[0].begin());
+      AudioBuffer chunk_output(kNumMonoChannels,
+                               chunked.GetNextOutputLength(this_chunk));
+      chunked.Process(chunk, &chunk_output);
+      for (size_t i = 0; i < chunk_output.num_frames(); ++i) {
+        chunked_output.push_back(chunk_output[0][i]);
+      }
+      offset += this_chunk;
+    }
+
+    ASSERT_EQ(one_shot_output.num_frames(), chunked_output.size())
+        << "for " << test_case.source_rate << " -> "
+        << test_case.destination_rate << ", chunk size "
+        << test_case.chunk_size;
+    for (size_t i = 0; i < chunked_output.size(); ++i) {
+      EXPECT_NEAR(one_shot_output[0][i], chunked_output[i], kEpsilonFloat)
+          << "at sample " << i << " for " << test_case.source_rate << " -> "
+          << test_case.destination_rate << ", chunk size "
+          << test_case.chunk_size;
+    }
   }
 }
 
