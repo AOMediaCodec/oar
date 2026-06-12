@@ -25,6 +25,7 @@
 #include "obr/ambisonic_binaural_decoder/resampler.h"
 #include "obr/ambisonic_binaural_decoder/wav.h"
 #include "obr/audio_buffer/audio_buffer.h"
+#include "obr/audio_buffer/simd_utils.h"
 #include "obr/common/ambisonic_utils.h"
 
 namespace obr {
@@ -57,6 +58,20 @@ std::unique_ptr<AudioBuffer> CreateShHrirsFromWav(const Wav& wav,
     std::unique_ptr<AudioBuffer> resampled_sh_hrirs(new AudioBuffer(
         num_channels, resampler->GetNextOutputLength(sh_hrir_length)));
     resampler->Process(*sh_hrirs, resampled_sh_hrirs.get());
+    // The resampler preserves the waveform of the impulse responses, but the
+    // gain of the filter realized by discrete convolution is proportional to
+    // the rate at which that waveform is sampled: convolving at the target
+    // rate accumulates target/wav times as many taps of the same continuous
+    // curve. Rescale so the realized frequency response - and thus the
+    // rendered loudness - is invariant to the target rate.
+    const float filter_gain_compensation =
+        static_cast<float>(wav_sample_rate_hz) /
+        static_cast<float>(target_sample_rate_hz);
+    for (size_t channel = 0; channel < num_channels; ++channel) {
+      auto& resampled_channel = (*resampled_sh_hrirs)[channel];
+      ScalarMultiply(resampled_channel.size(), filter_gain_compensation,
+                     resampled_channel.begin(), resampled_channel.begin());
+    }
     return resampled_sh_hrirs;
   }
   return sh_hrirs;
