@@ -2,14 +2,14 @@
 
 Official reference implementation for the AOM Open Audio Renderer (OAR).
 
-The `oar` library is designed to render [IAMF](https://aomediacodec.github.io/iamf/) bitstream, it supports both loudspeakder and binaural rendering.
+The `oar` library is designed to render [IAMF](https://aomediacodec.github.io/iamf/) bitstream, it supports both loudspeaker and binaural rendering.
 
 ## Features
 
 The library renders the following types of Audio Elements:
 
 * Ambisonics (from 0th to 4th order).
-* Channel-based (e.g. 5.1, 7.1.4). See [loudspeakder layout](https://aomediacodec.github.io/iamf/#loudspeaker_layout) and [expanded loudspeakder layout](https://aomediacodec.github.io/iamf/#expanded_loudspeaker_layout) for the full list of supported loudspeaker layouts.
+* Channel-based (e.g. 5.1, 7.1.4). See [loudspeaker layout](https://aomediacodec.github.io/iamf/#loudspeaker_layout) and [expanded loudspeaker layout](https://aomediacodec.github.io/iamf/#expanded_loudspeaker_layout) for the full list of supported loudspeaker layouts.
 * Object-based. The API allows for controlling the position of the object in the 3D space.
 
 ## Usage
