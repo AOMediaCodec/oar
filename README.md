@@ -1,6 +1,6 @@
-# Open Audio Renderer (OAR)
+# Open Audio Renderer v1 (OARv1)
 
-Official reference implementation for the AOM Open Audio Renderer (OAR).
+Official reference implementation for the AOM Open Audio Renderer Version 1 (OARv1).
 
 The `oar` library is designed to render [IAMF](https://aomediacodec.github.io/iamf/) bitstream, it supports both loudspeaker and binaural rendering.
 
