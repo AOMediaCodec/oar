@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 set(PROJECT_N oar)
-project(${PROJECT_N} VERSION 0.9.0)
+project(${PROJECT_N} VERSION 1.0.0)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED True)
