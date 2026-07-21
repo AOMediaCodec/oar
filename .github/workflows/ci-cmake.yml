@@ -1,0 +1,49 @@
+name: CMake
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        library: [shared, static]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        if: runner.os == 'Windows'
+
+      # CMAKE_Fortran_COMPILER=NOTFOUND stops Eigen's blas/ subdirectory from
+      # probing for a Fortran compiler (its check_language call skips the probe
+      # when the cache variable is already defined), which otherwise fails on
+      # Windows runners where MinGW gfortran is on the PATH alongside the MSVC
+      # toolchain.
+      - name: Configure
+        run: >
+          cmake -S . -B build
+          ${{ runner.os == 'Windows' && '-G Ninja' || '' }}
+          -DOAR_BUILD_EXAMPLES=ON
+          -DOAR_BUILD_SHARED_LIBRARY=${{ matrix.library == 'shared' && 'ON' || 'OFF' }}
+          -DCMAKE_Fortran_COMPILER=NOTFOUND
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run smoke tests
+        shell: bash
+        run: |
+          export PATH="$PWD/build:$PATH"
+          ./build/tests/examples/test_audio_element_types
+          ./build/tests/examples/test_channel_based_rendering
+          ./build/tests/examples/test_scene_based_rendering
+          ./build/tests/examples/test_object_based_rendering
+
+      - name: Run obr unit tests
+        run: ctest --test-dir build/src/renderer/obr/obr_capi/obr -L obr --output-on-failure
