@@ -342,7 +342,7 @@ int DMRenderer_downmix(DMRenderer *self, float *in[], float *out[],
                        uint32_t samples) {
   if (!self || !in || !out) return -22;
 
-  memset(self->chs_data, 0, IA_CH_COUNT * sizeof(float));
+  memset(self->chs_data, 0, sizeof(self->chs_data));
   for (int i = 0; i < self->chs_icount; ++i) {
     self->chs_data[self->chs_in[i]] = in[i];
   }
