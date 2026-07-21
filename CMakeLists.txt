@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.28)
 set(PROJECT_N oar)
 project(${PROJECT_N} VERSION 1.0.0)
 
+# Export all symbols when building oar as a DLL so an import library is
+# generated for the examples to link against.
+set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED True)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
