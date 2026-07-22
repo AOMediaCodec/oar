@@ -18,9 +18,25 @@ The `oar` library provides a C API for rendering IAMF (Immersive Audio Model and
 
 ### Build
 
+#### Using CMake
 ~~~
     $ cmake -B build
     $ cmake --build build
+~~~
+
+#### Using Bazel
+~~~
+    $ bazel build <build_target>
+~~~
+
+The `<build_target>` may be `src:oar` for building the `oar` library or `tests/examples/...` for building the example binaries, for example.
+
+Add `--config=arm64` at the end of the `bazel build` command when building for ARM CPUs.
+
+Note: the Open Binaural Renderer (`obr`) is enabled by default. To disable it,
+defines `OAR_ENABLE_BINAURALIZER` as `0`:
+~~~
+    $ bazel build <build_target> --define OAR_ENABLE_BINAURALIZER=0
 ~~~
 
 ### Basic Workflow

@@ -16,7 +16,11 @@
 #include <math.h>
 #include <stdint.h>
 
+// definitions.h supplies M_PI for the def_degrees_to_radians /
+// def_radians_to_degrees macros below when <math.h> does not (MSVC).
+#include "definitions.h"
 #include "oar.h"
+#include "oar_base.h"
 #include "oar_metadata.h"
 #include "renderer_library_api.h"
 

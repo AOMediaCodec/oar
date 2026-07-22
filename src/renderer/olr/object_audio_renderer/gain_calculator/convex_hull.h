@@ -8,6 +8,6 @@ struct Point {
   auto_float_t x, y;
 };
 
-int convexHull(struct Point in[], int n, struct Point out[], int *m);
+int convexHull(struct Point in[], int n, struct Point out[], int *k);
 
 #endif  // __CONVEX_HULL_H__

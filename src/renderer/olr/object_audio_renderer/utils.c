@@ -15,9 +15,9 @@
 #if defined(_MSC_VER)
 #define _USE_MATH_DEFINES
 #endif
-#include <math.h>
 
 #include "numc.h"
+#include "oar_config.h"
 
 cartesian_position_t polar_to_cartesian(polar_position_t polar) {
   return polar_to_cart(polar.azimuth, polar.elevation, polar.distance);

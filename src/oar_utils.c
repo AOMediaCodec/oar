@@ -12,7 +12,10 @@
 
 #include "oar_utils.h"
 
+#include <math.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <string.h>
 #include <time.h>
 
 #ifdef __as_dbg__
@@ -21,11 +24,11 @@
 #include "dep_wavwriter.h"
 #endif
 
-#include <math.h>
-#include <string.h>
-
+#include "animation.h"
 #include "definitions.h"
 #include "oar.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 #include "renderer/renderer_library_api.h"
 
 #define def_eps 1e-10

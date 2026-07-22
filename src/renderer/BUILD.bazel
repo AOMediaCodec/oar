@@ -1,0 +1,95 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "audio_element_renderer",
+    srcs = ["audio_element_renderer.c"],
+    hdrs = ["audio_element_renderer.h"],
+    strip_include_prefix = "//src/renderer",
+    deps = [
+        ":audio_renderer_api",
+        ":audio_renderer_base",
+        ":renderer_library_api",
+        ":renderer_library_manager",
+        "//include",
+        "//src:oar_utils",
+        "//src/common",
+        "//src/utility",
+    ],
+)
+
+cc_library(
+    name = "audio_elements_renderer",
+    srcs = ["audio_elements_renderer.c"],
+    hdrs = ["audio_elements_renderer.h"],
+    strip_include_prefix = "//src/renderer",
+    deps = [
+        ":audio_renderer_api",
+        ":audio_renderer_base",
+        ":renderer_library_api",
+        ":renderer_library_manager",
+        "//include",
+        "//src:oar_utils",
+        "//src/common",
+    ],
+)
+
+cc_library(
+    name = "audio_renderer_api",
+    hdrs = ["audio_renderer_api.h"],
+    strip_include_prefix = "//src/renderer",
+    deps = [
+        ":renderer_library_api",
+        "//include",
+        "//src/common",
+    ]
+)
+
+cc_library(
+    name = "audio_renderer_base",
+    srcs = ["audio_renderer_base.c"],
+    hdrs = ["audio_renderer_base.h"],
+    strip_include_prefix = "//src/renderer",
+    deps = [
+        ":audio_renderer_api",
+        ":renderer_library_api",
+        ":renderer_library_manager",
+        "//include",
+        "//src:oar_utils",
+        "//src/common",
+        "//src/utility",
+    ],
+)
+
+cc_library(
+    name = "renderer_library_api",
+    hdrs = ["renderer_library_api.h"],
+    strip_include_prefix = "//src/renderer",
+    deps = [
+        "//include",
+    ],
+)
+
+cc_library(
+    name = "renderer_library_manager",
+    srcs = ["renderer_library_manager.c"],
+    hdrs = ["renderer_library_manager.h"],
+    strip_include_prefix = "//src/renderer",
+    deps = [
+        ":renderer_library_api",
+        "//include",
+        "//src/common",
+    ],
+)
+
+cc_library(
+    name = "renderer_library_utils",
+    srcs = ["renderer_library_utils.c"],
+    hdrs = ["renderer_library_utils.h"],
+    strip_include_prefix = "//src/renderer",
+    deps = [
+        "//include",
+        ":renderer_library_api"
+    ],
+)

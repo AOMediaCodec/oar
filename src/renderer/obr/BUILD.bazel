@@ -1,0 +1,22 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+# Skipped (rather than built) by wildcard patterns like `//...` when the
+# binauralizer is disabled, so `--define OAR_ENABLE_BINAURALIZER=0` builds
+# never compile the obr C++ stack. Mirrors CMake, which skips the obr_capi
+# subdirectory when the option is OFF.
+cc_library(
+    name = "obr",
+    srcs = ["obr.c"],
+    hdrs = ["obr.h"],
+    target_compatible_with = select({
+        "//src:disable_binauralizer": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src/common",
+        "//src/renderer:renderer_library_api",
+		"//src/renderer/obr/obr_capi",
+	],
+)

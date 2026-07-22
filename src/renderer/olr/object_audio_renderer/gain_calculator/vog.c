@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include "gain_calculator.h"
+#include "oar_config.h"
 
 static void _vog_destroy(gain_calculator_t *self) {
   if (self) free(self);

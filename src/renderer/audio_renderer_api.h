@@ -13,8 +13,11 @@
 #ifndef __AUDIO_RENDERER_API_H__
 #define __AUDIO_RENDERER_API_H__
 
+#include <stdint.h>
+
 #include "oar.h"
-#include "renderer/renderer_library_manager.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 
 #ifdef __cplusplus
 extern "C" {

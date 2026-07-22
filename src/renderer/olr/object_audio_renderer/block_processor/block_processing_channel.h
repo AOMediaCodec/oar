@@ -13,6 +13,8 @@
 #ifndef __BLOCK_PROCESSING_CHANNEL_H__
 #define __BLOCK_PROCESSING_CHANNEL_H__
 
+#include <stdint.h>
+
 #include "gain_calculator/gain_calculator.h"
 #include "object_based_audio_renderer.h"
 

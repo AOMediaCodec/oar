@@ -1,0 +1,28 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "common",
+    srcs = [
+        "carray.c",
+        "cdeque.c",
+        "chashmap.c",
+        "clog.c",
+        "cqueue.c",
+        "cvector.c",
+        "dep_wavwriter.c",
+    ],
+    hdrs = [
+        "carray.h",
+        "cdeque.h",
+        "chashmap.h",
+        "clog.h",
+        "cqueue.h",
+        "cvalue.h",
+        "cvector.h",
+        "definitions.h",
+        "dep_wavwriter.h",
+    ],
+    strip_include_prefix = "//src/common",
+)

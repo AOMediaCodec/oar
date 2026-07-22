@@ -13,6 +13,8 @@
 #ifndef __RENDERER_H__
 #define __RENDERER_H__
 
+#include <stdint.h>
+
 #include "gain_calculator/gain_calculator.h"
 #include "object_based_audio_renderer.h"
 

@@ -12,6 +12,8 @@
 
 #include "layout.h"
 
+#include "oar_config.h"
+#include "object_based_audio_renderer.h"
 #include "utils.h"
 
 static speaker_position_t g_sp_mp000 = {"M+000", 0.0, 0.0, 0};

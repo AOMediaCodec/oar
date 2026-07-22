@@ -13,6 +13,8 @@
 #ifndef __PROCESSING_BLOCK_H__
 #define __PROCESSING_BLOCK_H__
 
+#include <stdint.h>
+
 #include "oar_config.h"
 
 typedef struct ProcessingBlock {

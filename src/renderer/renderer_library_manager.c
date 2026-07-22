@@ -22,8 +22,10 @@
 #include <string.h>
 
 #include "clog.h"
+#include "cqueue.h"
 #include "cvalue.h"
-#include "oar_utils.h"
+#include "oar_base.h"
+#include "renderer_library_api.h"
 
 int renderer_library_manager_init(renderer_library_manager_t *self) {
   memset(self, 0, sizeof(*self));

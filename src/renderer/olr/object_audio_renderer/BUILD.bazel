@@ -1,0 +1,85 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "object_based_audio_renderer_header",
+    hdrs = [
+        "object_based_audio_renderer.h",
+    ],
+    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    deps = [
+        "//src:oar_config",
+    ],
+)
+
+cc_library(
+    name = "object_based_audio_renderer",
+    srcs = [
+        "object_based_audio_renderer.c",
+    ],
+    deps = [
+        ":object_based_audio_renderer_header",
+        ":renderer",
+        ":layout",
+        ":utils",
+        "//src/common",
+        "//src:oar_config",
+        "//src/renderer/olr/object_audio_renderer/gain_calculator:convex_hull",
+        "//src/renderer/olr/object_audio_renderer/block_processor:block_processing_channel",
+        "//src/renderer/olr/object_audio_renderer/gain_calculator:gain_calculator",
+    ],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "layout",
+    srcs = [
+        "layout.c",
+    ],
+    hdrs = [
+        "layout.h",
+    ],
+    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    deps = [
+        ":object_based_audio_renderer_header",
+        ":utils",
+        "//src/common",
+        "//src:oar_config",
+    ],
+)
+
+cc_library(
+    name = "renderer",
+    srcs = [
+        "renderer.c",
+    ],
+    hdrs = [
+        "renderer.h",
+    ],
+    deps = [
+        ":object_based_audio_renderer_header",
+        ":layout",
+        ":utils",
+        "//src/common",
+        "//src/renderer/olr/object_audio_renderer/block_processor:block_processing_channel",
+        "//src/renderer/olr/object_audio_renderer/gain_calculator",
+    ],
+)
+
+cc_library(
+    name = "utils",
+    srcs = [
+        "numc.c",
+        "utils.c",
+    ],
+    hdrs = [
+        "numc.h",
+        "utils.h",
+    ],
+    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    deps = [
+        "//src/common",
+        "//src:oar_config",
+    ],
+)

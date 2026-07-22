@@ -1,0 +1,42 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "convex_hull",
+    srcs = ["convex_hull.c"],
+    hdrs = ["convex_hull.h"],
+    deps = [
+        "//src/common",
+        "//src:oar_config",
+    ],
+)
+
+cc_library(
+    name = "gain_calculator",
+    srcs = [
+        "custom_gain_calculator.c",
+        "dbap_panner_2d.c",
+        "gain_calculator.c",
+        "vbap_panner_2d.c",
+        "vbap_region.c",
+        "vog.c",
+    ],
+    hdrs = [
+        "custom_gain_calculator.h",
+        "dbap_panner_2d.h",
+        "gain_calculator.h",
+        "vbap_panner_2d.h",
+        "vbap_region.h",
+        "vog.h",
+    ],
+    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    deps = [
+        ":convex_hull",
+        "//src/common",
+        "//src:oar_config",
+        "//src/renderer/olr/object_audio_renderer:layout",
+        "//src/renderer/olr/object_audio_renderer:utils",
+        "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
+    ],
+)

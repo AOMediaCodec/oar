@@ -16,8 +16,8 @@
 
 #include "custom_gain_calculator.h"
 #include "layout.h"
-#include "numc.h"
-#include "utils.h"
+#include "oar_config.h"
+#include "object_based_audio_renderer.h"
 
 static int _layout_gain_calculator_calculate_block_gains(
     layout_gain_calculator_t *self, metadata_block_t *block,
