@@ -449,6 +449,16 @@ uint32_t audio_elements_renderer_get_channels(audio_renderer_base_t *base) {
   return self->channels_count;
 }
 
+int audio_elements_renderer_get_element_channels(audio_renderer_base_t *base,
+                                                 uint32_t element_id) {
+  audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
+  if (!self) return 0;
+
+  audio_element_context_t *ctx = def_value_wrap_optional_type_ptr(
+      audio_element_context_t, hash_map_get(self->element_map, element_id));
+  return ctx ? (int)rid_channels_count(ctx->rid) : 0;
+}
+
 void audio_elements_renderer_metadatas_elapse(audio_renderer_base_t *base,
                                               uint32_t samples_per_channel) {
   audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
@@ -505,6 +515,7 @@ audio_renderer_base_t *audio_elements_renderer_create_wrapper(
             audio_elements_renderer_set_element_head_locked,
         .set_head_rotation = audio_renderer_set_head_rotation,
         .get_channels = audio_elements_renderer_get_channels,
+        .get_element_channels = audio_elements_renderer_get_element_channels,
         .metadatas_elapse = audio_elements_renderer_metadatas_elapse,
     };
 
