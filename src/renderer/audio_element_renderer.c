@@ -12,15 +12,23 @@
 
 #include "audio_element_renderer.h"
 
-#include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "animated.h"
+#include "audio_renderer_api.h"
+#include "audio_renderer_base.h"
 #include "clog.h"
+#include "cqueue.h"
+#include "cvalue.h"
 #include "cvector.h"
 #include "definitions.h"
+#include "oar.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 #include "oar_utils.h"
+#include "renderer_library_api.h"
+#include "renderer_library_manager.h"
 
 typedef struct AudioElementRenderer {
   audio_renderer_base_t base;  // Base class

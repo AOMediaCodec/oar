@@ -1,0 +1,6 @@
+package(default_visibility = ["//src:__subpackages__"])
+
+filegroup(
+    name = "matrix_render_arm_srcs",
+    srcs = ["matrix_render_arm.c"],
+)

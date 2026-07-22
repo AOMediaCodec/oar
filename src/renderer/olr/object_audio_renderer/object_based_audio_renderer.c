@@ -12,13 +12,11 @@
 
 #include "object_based_audio_renderer.h"
 
-#include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "gain_calculator/gain_calculator.h"
-#include "layout.h"
 #include "renderer.h"
-#include "utils.h"
 
 struct ObjectAudioRenderer {
   layout_gain_calculator_t *calculator;

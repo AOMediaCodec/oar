@@ -13,7 +13,10 @@
 #include <math.h>
 #include <string.h>
 
+#include "animation.h"
+
 #include "animated.h"
+#include "oar_base.h"
 #include "oar_utils.h"
 
 // Animation calculation functions converted from macros

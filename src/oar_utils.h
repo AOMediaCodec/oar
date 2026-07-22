@@ -13,10 +13,10 @@
 #ifndef __OAR_UTILS_H__
 #define __OAR_UTILS_H__
 
-#include <math.h>
 #include <stdint.h>
 
 #include "oar.h"
+#include "oar_base.h"
 #include "oar_metadata.h"
 #include "renderer_library_api.h"
 

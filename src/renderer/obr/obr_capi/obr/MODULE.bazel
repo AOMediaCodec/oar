@@ -34,3 +34,9 @@ bazel_dep(
     name = "eigen",
     version = "3.4.0.bcr.3",
 )
+
+pffft_ext = use_extension("//:extensions.bzl", "pffft_ext")
+use_repo(pffft_ext, "pffft")
+
+com_google_audio_to_tactile_ext = use_extension("//:extensions.bzl", "com_google_audio_to_tactile_ext")
+use_repo(com_google_audio_to_tactile_ext, "com_google_audio_to_tactile")

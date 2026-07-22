@@ -9,6 +9,11 @@ build --enable_runfiles
 build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 build --enable_platform_specific_config
 
+# This is to tell GCC to not generate .sframe sections, which does not work
+# with the LLVM linker (LLD).
+build --copt="-Wa,--gsframe=no"
+build --cxxopt="-Wa,--gsframe=no"
+
 # Platform specific configuration.
 build:linux --linkopt=-lm
 build:linux --cxxopt=-std=c++20

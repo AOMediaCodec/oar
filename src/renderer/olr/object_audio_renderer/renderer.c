@@ -12,16 +12,18 @@
 
 #include "renderer.h"
 
-#include <math.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "block_processor/block_processing_channel.h"
+#include "gain_calculator/gain_calculator.h"
+#include "clog.h"
+#include "cvalue.h"
 #include "cvector.h"
 #include "definitions.h"
-#include "layout.h"
-#include "utils.h"
+#include "object_based_audio_renderer.h"
 
 def_key_value_type(int, block_processing_channel_t *, processing_channel);
 

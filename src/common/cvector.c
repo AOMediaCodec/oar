@@ -23,6 +23,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "cvalue.h"
+
 #define CAP_DEFAULT 6
 
 struct CVector {

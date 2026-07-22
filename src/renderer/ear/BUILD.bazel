@@ -1,0 +1,39 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "ae_rdr",
+    hdrs = ["ae_rdr.h"],
+    srcs = [
+        "h2m_rdr.c",
+        "m2m_rdr.c",
+    ],
+    deps = [
+        ":matrix_render",
+    ],
+)
+
+cc_library(
+    name = "ear",
+    srcs = ["ear.c"],
+    hdrs = ["ear.h"],
+    deps = [
+        ":ae_rdr",
+        "//include",
+        "//src/common",
+        "//src/renderer:renderer_library_api",
+        "//src/renderer:renderer_library_utils",
+    ],
+)
+
+cc_library(
+    name = "matrix_render",
+    srcs = [
+        "matrix_render.c",
+        "//src/renderer/ear/arch/arm:matrix_render_arm_srcs",
+        "//src/renderer/ear/arch/x86:matrix_render_x86_srcs",
+    ],
+    hdrs = ["matrix_render.h"],
+    strip_include_prefix = "//src/renderer/ear",
+)

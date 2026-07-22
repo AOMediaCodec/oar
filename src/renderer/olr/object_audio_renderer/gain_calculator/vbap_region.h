@@ -16,6 +16,7 @@
 #include <carray.h>
 
 #include "gain_calculator.h"
+#include "oar_config.h"
 
 typedef struct VBAPRegion {
   gain_calculator_t base;

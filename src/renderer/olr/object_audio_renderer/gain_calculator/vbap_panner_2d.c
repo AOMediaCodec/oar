@@ -15,9 +15,16 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "carray.h"
+#include "clog.h"
+#include "cvalue.h"
+#include "cvector.h"
 #include "convex_hull.h"
 #include "definitions.h"
+#include "gain_calculator.h"
+#include "layout.h"
 #include "numc.h"
+#include "oar_config.h"
 #include "utils.h"
 #include "vbap_region.h"
 #include "vog.h"

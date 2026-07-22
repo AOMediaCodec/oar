@@ -13,7 +13,10 @@
 
 #include "carray.h"
 
+#include <stdint.h>
 #include <stdlib.h>
+
+#include "cvalue.h"
 
 struct CArray {
   value_wrap_t* items;

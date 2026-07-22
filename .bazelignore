@@ -1,0 +1,5 @@
+# The nested obr package is treated as an external respository, referenced
+# in the MODULE.bazel file using `local_path_override()`.
+# To build targets in the nested obr package, use `bazel build @obr//...`
+# instead of `bazel build //src/renderer/obr/obr_capi/obr/...`.
+src/renderer/obr/obr_capi/obr

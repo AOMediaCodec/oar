@@ -1,0 +1,19 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+filegroup(
+    name = "header_files",
+    srcs = [
+        "animation.h",
+        "oar.h",
+        "oar_base.h",
+        "oar_metadata.h",
+    ],
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "include",
+    hdrs = [":header_files"],
+    strip_include_prefix = "//include",
+    visibility = ["//visibility:public"],
+)

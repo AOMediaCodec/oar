@@ -1,0 +1,12 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "obr_capi",
+    srcs = ["obr_capi.cpp"],
+    hdrs = ["obr_capi.h"],
+    deps = [
+        "@obr//obr/renderer:obr_impl",
+    ]
+)

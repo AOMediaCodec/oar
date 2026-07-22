@@ -1,0 +1,13 @@
+module(
+    name = "liboar",
+    version = "1.0.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.1.1")
+
+bazel_dep(name = "obr", version = "1.0.0")
+
+local_path_override(
+    module_name = "obr",
+    path = "src/renderer/obr/obr_capi/obr",
+)

@@ -1,0 +1,13 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "oar_limiter",
+    srcs = ["oar_limiter.c"],
+    hdrs = ["oar_limiter.h"],
+    deps = [
+        "//include",
+        "//src/common",
+    ],
+)

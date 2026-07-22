@@ -12,11 +12,13 @@
 
 #include "processing_block.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "clog.h"
 #include "definitions.h"
-#include "utils.h"
+#include "oar_config.h"
 
 typedef struct FixedGains {
   processing_block_t base;

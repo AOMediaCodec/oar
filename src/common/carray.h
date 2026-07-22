@@ -13,6 +13,8 @@
 #ifndef __CARRAY_H__
 #define __CARRAY_H__
 
+#include <stdint.h>
+
 #include "cvalue.h"
 
 typedef struct CArray array_t;
