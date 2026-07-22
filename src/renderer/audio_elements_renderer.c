@@ -12,10 +12,23 @@
 
 #include "audio_elements_renderer.h"
 
-#include "common/chashmap.h"
-#include "common/clog.h"
-#include "common/definitions.h"
+#include <stdint.h>
+#include <string.h>
+
+#include "audio_renderer_api.h"
+#include "audio_renderer_base.h"
+#include "chashmap.h"
+#include "clog.h"
+#include "cqueue.h"
+#include "cvalue.h"
+#include "cvector.h"
+#include "definitions.h"
+#include "oar.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 #include "oar_utils.h"
+#include "renderer_library_manager.h"
+#include "renderer_library_api.h"
 
 typedef struct AudioElementsRenderer {
   audio_renderer_base_t base;

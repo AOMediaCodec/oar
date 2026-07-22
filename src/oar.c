@@ -12,22 +12,27 @@
 
 #include "oar.h"
 
-#include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "animated.h"
 #include "audio_element_renderer.h"
 #include "audio_elements_renderer.h"
+#include "audio_renderer_base.h"
 #include "clog.h"
+#include "cqueue.h"
+#include "cvalue.h"
 #include "cvector.h"
 #include "definitions.h"
 #include "limiter/oar_limiter.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 #include "oar_utils.h"
 #include "renderer/downmix/downmix.h"
 #include "renderer/ear/ear.h"
 #include "renderer/olr/olr.h"
-#include "renderer/renderer_library_manager.h"
+#include "renderer_library_api.h"
+#include "renderer_library_manager.h"
 
 #ifdef __binauralizer__
 #include "renderer/obr/obr.h"

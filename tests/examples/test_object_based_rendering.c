@@ -11,6 +11,7 @@
  */
 
 #include <math.h>  // For sine wave generation
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,7 +21,10 @@
 #endif
 
 // Include the OAR header
+#include "animation.h"
 #include "oar.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 
 // Helper function to create a basic OAR config
 oar_config_t create_default_oar_config() {

@@ -1,0 +1,23 @@
+# Open Audio Renderer Library (liboar).
+
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+# [internal] load license.bzl
+
+# [internal] license
+
+licenses(["notice"])
+
+exports_files(["LICENSE"])
+
+cc_library(
+    name = "liboar",
+    hdrs = [
+        "//include:header_files",
+    ],
+    strip_include_prefix = "//include",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//src:oar",
+    ],
+)

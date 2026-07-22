@@ -13,10 +13,11 @@
 #ifndef __AUDIO_ELEMENT_RENDERER_H__
 #define __AUDIO_ELEMENT_RENDERER_H__
 
+#include <stdint.h>
+
 #include "audio_renderer_base.h"
 #include "oar.h"
-#include "oar_metadata.h"
-#include "renderer/renderer_library_manager.h"
+#include "renderer_library_manager.h"
 
 #ifdef __cplusplus
 extern "C" {

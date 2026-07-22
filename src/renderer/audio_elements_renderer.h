@@ -15,6 +15,11 @@
 
 #include "audio_renderer_base.h"
 
+#include <stdint.h>
+
+#include "oar.h"
+#include "renderer_library_manager.h"
+
 // Constructor
 audio_renderer_base_t *audio_elements_renderer_create_wrapper(
     const oar_config_t *oar_config, uint32_t id,

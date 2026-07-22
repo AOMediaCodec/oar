@@ -15,6 +15,7 @@
 
 #include "gain_calculator/gain_calculator.h"
 #include "processing_block.h"
+#include "object_based_audio_renderer.h"
 
 typedef struct InterpretObjectMetadata interpret_object_metadata_t;
 

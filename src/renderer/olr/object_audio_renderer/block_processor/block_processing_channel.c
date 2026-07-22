@@ -12,14 +12,19 @@
 
 #include "block_processing_channel.h"
 
+#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "cdeque.h"
+#include "clog.h"
+#include "cvalue.h"
 #include "cvector.h"
 #include "definitions.h"
 #include "interpret_object_metadata.h"
+#include "gain_calculator/gain_calculator.h"
+#include "object_based_audio_renderer.h"
 #include "processing_block.h"
-#include "utils.h"
 
 struct BlockProcessingChannel {
   vector_t* metadata_blocks;

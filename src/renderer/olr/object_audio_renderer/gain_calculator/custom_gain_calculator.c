@@ -12,16 +12,17 @@
 
 #include "custom_gain_calculator.h"
 
-#include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 
-#include "carray.h"
-#include "common/definitions.h"
-#include "convex_hull.h"
+#include "definitions.h"
+#include "cvalue.h"
 #include "cvector.h"
 #include "dbap_panner_2d.h"
+#include "gain_calculator.h"
+#include "layout.h"
 #include "numc.h"
-#include "utils.h"
+#include "oar_config.h"
 #include "vbap_panner_2d.h"
 #include "vog.h"
 

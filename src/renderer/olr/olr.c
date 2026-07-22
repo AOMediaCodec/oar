@@ -12,13 +12,14 @@
 
 #include "olr.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 
 #include "clog.h"
 #include "definitions.h"
+#include "oar_base.h"
 #include "oar_metadata.h"
 #include "object_audio_renderer/object_based_audio_renderer.h"
-#include "object_audio_renderer/utils.h"
 #include "renderer_library_api.h"
 
 typedef struct OlrContext {

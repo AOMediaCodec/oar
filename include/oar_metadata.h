@@ -13,6 +13,8 @@
 #ifndef __OAR_METADATA_H__
 #define __OAR_METADATA_H__
 
+#include <stdint.h>
+
 #include "animation.h"
 #include "oar_base.h"
 

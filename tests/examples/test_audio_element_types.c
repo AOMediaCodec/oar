@@ -10,12 +10,14 @@
  * www.aomedia.org/license/patent.
  */
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 // Include the OAR header
 #include "oar.h"
+#include "oar_base.h"
 
 // Helper function to create a basic OAR config
 oar_config_t create_default_oar_config() {

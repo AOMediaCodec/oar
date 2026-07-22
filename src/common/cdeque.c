@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "cvalue.h"
+
 typedef struct CNote {
   value_wrap_t data;
   struct CNote* prev;

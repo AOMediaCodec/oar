@@ -21,6 +21,8 @@
 
 #include <stdlib.h>
 
+#include "cvalue.h"
+
 typedef struct CNode node_t;
 struct CNode {
   value_wrap_t value;
@@ -133,15 +135,15 @@ int queue_custom_push(queue_t *q, value_wrap_t v, queue_custom_func_t cmp) {
 }
 
 value_wrap_t *queue_custom_find(queue_t *q, value_wrap_t v,
-                                queue_custom_func_t func) {
+                                queue_custom_func_t cmp) {
   node_t *n = 0;
   value_wrap_t *rv = 0;
 
-  if (!q || !func) return 0;
+  if (!q || !cmp) return 0;
 
   n = q->front;
   while (n) {
-    if (func(v, n->value)) {
+    if (cmp(v, n->value)) {
       rv = &n->value;
       break;
     } else {

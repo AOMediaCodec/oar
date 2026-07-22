@@ -14,7 +14,11 @@
 #define _USE_MATH_DEFINES
 #endif
 #include "numc.h"
+
+#include <math.h>
 #include <stdlib.h>
+
+#include "oar_config.h"
 
 auto_float_t nc_radians(auto_float_t degrees) { return degrees * M_PI / 180.0; }
 
@@ -50,13 +54,13 @@ int nc_argsort(const auto_float_t *arr, int n, int *idx) {
 
 int nc_sign(auto_float_t x) { return x > 0 ? 1 : (x < 0 ? -1 : 0); }
 
-int nc_dot_n_nxn(const auto_float_t *_n, const auto_float_t *_nxn, int n,
+int nc_dot_n_nxn(const auto_float_t *a, const auto_float_t *b, int n,
                  auto_float_t *out) {
   for (int i = 0; i < n; ++i) {
     out[i] = 0;
 
     for (int j = 0; j < n; ++j) {
-      out[i] += _n[j] * _nxn[j * n + i];
+      out[i] += a[j] * b[j * n + i];
     }
   }
   return 0;

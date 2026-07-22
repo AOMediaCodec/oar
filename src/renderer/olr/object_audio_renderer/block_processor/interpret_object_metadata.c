@@ -12,12 +12,14 @@
 
 #include "interpret_object_metadata.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 
-#include "cvalue.h"
-#include "cvector.h"
 #include "definitions.h"
-#include "utils.h"
+#include "gain_calculator/gain_calculator.h"
+#include "oar_config.h"
+#include "object_based_audio_renderer.h"
+#include "processing_block.h"
 
 struct InterpretObjectMetadata {
   layout_gain_calculator_t *gain_calculator;

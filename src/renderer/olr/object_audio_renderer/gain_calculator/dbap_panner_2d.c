@@ -16,8 +16,13 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include "cvalue.h"
+#include "cvector.h"
 #include "definitions.h"
+#include "gain_calculator.h"
+#include "layout.h"
 #include "numc.h"
+#include "oar_config.h"
 #include "utils.h"
 
 typedef struct DBAPPanner2D {

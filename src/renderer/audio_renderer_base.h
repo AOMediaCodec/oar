@@ -13,12 +13,15 @@
 #ifndef __AUDIO_RENDERER_BASE_H__
 #define __AUDIO_RENDERER_BASE_H__
 
+#include <stdint.h>
+
 #include "audio_renderer_api.h"
-#include "common/cqueue.h"
-#include "common/cvector.h"
+#include "cqueue.h"
+#include "cvector.h"
+#include "oar.h"
 #include "oar_base.h"
 #include "oar_metadata.h"
-#include "renderer/renderer_library_manager.h"
+#include "renderer_library_api.h"
 
 #ifdef __cplusplus
 extern "C" {

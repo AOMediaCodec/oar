@@ -1,0 +1,25 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "downmix",
+    srcs = ["downmix.c"],
+    hdrs = ["downmix.h"],
+    deps = [
+        ":downmix_renderer",
+        "//include",
+        "//src:oar_utils",
+        "//src/common",
+        "//src/renderer:renderer_library_api",
+    ],
+)
+
+cc_library(
+    name = "downmix_renderer",
+    srcs = ["downmix_renderer.c"],
+    hdrs = ["downmix_renderer.h"],
+    deps = [
+        "//src/common",
+    ],
+)

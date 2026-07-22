@@ -16,5 +16,5 @@
 #include "cvector.h"
 #include "gain_calculator.h"
 
-gain_calculator_t *dbap_panner_2d_create(vector_t *speakers);
+gain_calculator_t *dbap_panner_2d_create(vector_t *speaker_positions);
 #endif  // __DBAP_PANNER_2D_H__

@@ -1,0 +1,17 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+# See the comment on //src/renderer/obr:obr.
+cc_library(
+    name = "obr_capi",
+    srcs = ["obr_capi.cpp"],
+    hdrs = ["obr_capi.h"],
+    target_compatible_with = select({
+        "//src:disable_binauralizer": ["@platforms//:incompatible"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "@obr//obr/renderer:obr_impl",
+    ]
+)

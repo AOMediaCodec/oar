@@ -13,7 +13,7 @@
 #ifndef __LAYOUT_H__
 #define __LAYOUT_H__
 
-#include "cvalue.h"
+#include "oar_config.h"
 #include "object_based_audio_renderer.h"
 
 #define def_max_speakers 24
