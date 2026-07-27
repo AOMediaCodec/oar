@@ -224,6 +224,8 @@ int oar_add_audio_group(oar_t *oar) {
       return ck_oar_error_notsup;
     }
 
+    binaural_renderer->head_tracking_enabled = !!oar->enable_head_tracking;
+
     // Add binaural_renderer as a regular renderer to the renderers vector
     if (vector_push(group->renderers,
                     def_value_wrap_instance_ptr(binaural_renderer)) <= 0) {

@@ -418,6 +418,8 @@ int audio_renderer_enable_head_tracking(audio_renderer_base_t *base,
   if (!base) return ck_oar_error_inval;
   if (base->ctx.out != ck_rio_id_binaural) return ck_oar_error_notsup;
 
+  base->head_tracking_enabled = !!enable;
+
   if (base->lib && base->lib->set_attribute) {
     ret = base->lib->set_attribute(&base->ctx, ck_attribute_head_tracking,
                                    &enable);

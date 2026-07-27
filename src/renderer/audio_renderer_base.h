@@ -65,6 +65,7 @@ struct AudioRendererBase {
   const renderer_library_api_t *lib;
   const uint32_t *metadata_samples_ref;
   oar_audio_block_t block;
+  int head_tracking_enabled;
 };
 
 // AudioElementContext related functions

@@ -247,6 +247,14 @@ int audio_elements_renderer_add_element(
       audio_element_context_delete(ctx);
       return ret;
     }
+
+    if (self->base.lib->set_attribute && self->base.head_tracking_enabled) {
+      int err = self->base.lib->set_attribute(
+          &self->base.ctx, ck_attribute_head_tracking,
+          &self->base.head_tracking_enabled);
+      if (err != ck_oar_ok)
+        warning("Failed to propagate head tracking state: %d", err);
+    }
   }
 
   if (self->base.lib && self->base.lib->set_attribute) {
