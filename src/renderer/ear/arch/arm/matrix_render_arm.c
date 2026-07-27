@@ -11,6 +11,7 @@
  */
 
 
+#include "matrix_render.h"
 #if defined(def_oar_arch_arm)
 #include <arm_neon.h>
 
