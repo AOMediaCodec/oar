@@ -1,0 +1,13 @@
+module(
+    name = "oar",
+    version = "0.1.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.2.17")
+bazel_dep(name = "abseil-cpp", version = "20260107.1")
+bazel_dep(name = "eigen", version = "3.4.0.bcr.3")
+
+# pffft — small FFT library needed by OBR. Not on BCR; pulled from upstream
+# bitbucket with a local BUILD shim.
+non_module_deps = use_extension("//:extensions.bzl", "non_module_deps")
+use_repo(non_module_deps, "pffft")

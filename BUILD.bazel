@@ -1,0 +1,151 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//visibility:public"])
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OAR Core — Open Loudspeaker Renderer (OLR) + framework
+# Everything under src/ except the OBR bridge and oar.c itself
+# (those are compiled with -D__binauralizer__ below).
+# ─────────────────────────────────────────────────────────────────────────────
+
+cc_library(
+    name = "oar_core",
+    srcs = glob(
+        ["src/**/*.c"],
+        exclude = [
+            "src/renderer/obr/**",
+            "src/oar.c",
+        ],
+    ),
+    hdrs = glob(["include/*.h"]),
+    copts = ["-std=c11"],
+    includes = [
+        "include",
+        "src",
+        "src/common",
+        "src/renderer",
+        "src/renderer/ear",
+        "src/renderer/olr",
+        "src/renderer/olr/object_audio_renderer",
+        "src/utility",
+    ],
+    textual_hdrs = glob(
+        ["src/**/*.h"],
+        exclude = ["src/renderer/obr/**"],
+    ),
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OBR — Open Binaural Renderer (nested google/obr subtree)
+# Sources live at src/renderer/obr/obr_capi/obr/obr/**.
+# Include root is src/renderer/obr/obr_capi/obr/ so callers use
+# "obr/..." paths.
+# ─────────────────────────────────────────────────────────────────────────────
+
+OBR_PREFIX = "src/renderer/obr/obr_capi/obr"
+
+cc_library(
+    name = "obr_lib",
+    srcs = glob(
+        [OBR_PREFIX + "/obr/**/*.cc"],
+        exclude = [
+            OBR_PREFIX + "/obr/**/test*/**",
+            OBR_PREFIX + "/obr/**/tests/**",
+            OBR_PREFIX + "/obr/cli/**",
+        ],
+    ),
+    hdrs = glob(
+        [OBR_PREFIX + "/obr/**/*.h"],
+        exclude = [
+            OBR_PREFIX + "/obr/**/test*/**",
+            OBR_PREFIX + "/obr/**/tests/**",
+            OBR_PREFIX + "/obr/cli/**",
+        ],
+    ),
+    copts = ["-std=c++20"],
+    includes = [OBR_PREFIX],
+    deps = [
+        "@abseil-cpp//absl/base:no_destructor",
+        "@abseil-cpp//absl/container:btree",
+        "@abseil-cpp//absl/container:flat_hash_map",
+        "@abseil-cpp//absl/log:absl_check",
+        "@abseil-cpp//absl/log:absl_log",
+        "@abseil-cpp//absl/log:die_if_null",
+        "@abseil-cpp//absl/status",
+        "@abseil-cpp//absl/status:statusor",
+        "@abseil-cpp//absl/strings",
+        "@abseil-cpp//absl/synchronization",
+        "@eigen",
+        "@pffft",
+    ],
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OBR C API wrapper (obr_capi.cpp wraps obr::ObrImpl in a C interface).
+# ─────────────────────────────────────────────────────────────────────────────
+
+cc_library(
+    name = "obr_capi",
+    srcs = ["src/renderer/obr/obr_capi/obr_capi.cpp"],
+    hdrs = ["src/renderer/obr/obr_capi/obr_capi.h"],
+    copts = ["-std=c++20"],
+    includes = ["src/renderer/obr/obr_capi"],
+    deps = [":obr_lib"],
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# OBR bridge (C glue between OAR core and OBR).
+# ─────────────────────────────────────────────────────────────────────────────
+
+cc_library(
+    name = "obr_bridge",
+    srcs = ["src/renderer/obr/obr.c"],
+    hdrs = ["src/renderer/obr/obr.h"],
+    copts = [
+        "-std=c11",
+        "-D__binauralizer__",
+    ],
+    includes = [
+        "include",
+        "src",
+        "src/common",
+        "src/renderer",
+        "src/renderer/obr",
+        "src/utility",
+    ],
+    textual_hdrs = glob(
+        ["src/**/*.h"],
+        exclude = ["src/renderer/obr/obr_capi/**"],
+    ),
+    deps = [
+        ":oar_core",
+        ":obr_capi",
+    ],
+)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Full OAR — OLR + OBR combined.
+# oar.c is recompiled here WITH __binauralizer__ so it registers the OBR
+# renderer library at init time.
+# ─────────────────────────────────────────────────────────────────────────────
+
+cc_library(
+    name = "oar",
+    srcs = ["src/oar.c"],
+    copts = [
+        "-std=c11",
+        "-D__binauralizer__",
+    ],
+    includes = [
+        "include",
+        "src",
+        "src/common",
+        "src/renderer",
+        "src/utility",
+    ],
+    textual_hdrs = glob(["src/**/*.h"]),
+    deps = [
+        ":oar_core",
+        ":obr_bridge",
+    ],
+)

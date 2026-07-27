@@ -1,1 +1,8 @@
 build/
+
+# macOS
+.DS_Store
+
+# Bazel build artifacts (standalone builds in this repo)
+/bazel-*
+/MODULE.bazel.lock

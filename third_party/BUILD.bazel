@@ -1,0 +1,4 @@
+# Marks this directory as a Bazel package so pffft.BUILD can be referenced
+# by `@oar//third_party:pffft.BUILD` from the module extension. (Bazel 9
+# reserves the top-level `external` package name, so the shim lives here.)
+exports_files(["pffft.BUILD"])
