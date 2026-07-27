@@ -142,6 +142,7 @@ static int _open(renderer_library_context_t *ctx) {
 static int _set_attribute(renderer_library_context_t *ctx,
                           rendering_attribute_t attr, const void *value) {
   obr_renderer_t *obr = ctx->renderer;
+  if (!obr || !obr->api) return ck_oar_error_inval;
   switch (attr) {
     case ck_attribute_head_tracking:
       obr_enable_head_tracking(obr->api, *(int *)value);
@@ -187,7 +188,7 @@ static int _set_attribute(renderer_library_context_t *ctx,
 static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
                             const oar_metadata_t *metadata) {
   obr_renderer_t *obr = ctx->renderer;
-
+  if (!obr || !obr->api) return ck_oar_error_inval;
   switch (metadata->type) {
     case ck_metadata_object_positions: {
       int num_elements = obr_get_number_of_audio_elements(obr->api);
