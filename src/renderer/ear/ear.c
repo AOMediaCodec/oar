@@ -279,6 +279,10 @@ static int _open(renderer_library_context_t *ctx) {
     }
 #endif
   }
+  // pout is stack-local; the matrix lookups above are its only consumers, so
+  // clear the pointer (as the input-layout paths do) rather than let it
+  // dangle for the renderer's lifetime.
+  ear_renderer->out_sp_layout.sp_layout.predefined_sp = 0;
   return 0;
 }
 
