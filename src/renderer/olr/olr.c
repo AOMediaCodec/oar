@@ -12,6 +12,7 @@
 
 #include "olr.h"
 
+#include <math.h>
 #include <stdlib.h>
 
 #include "clog.h"
@@ -158,6 +159,19 @@ static int _set_attribute(renderer_library_context_t *ctx,
   return ck_oar_ok;
 }
 
+// Wrap an azimuth into the canonical (-180, 180] range so downstream gain
+// calculators never see aliased angles (e.g. +270 for -90): the front-back
+// fold and the closest-speaker fallback only handle canonical values.
+static float __wrap_azimuth(float azimuth) {
+  azimuth = fmodf(azimuth, 360.f);
+  if (azimuth > 180.f) {
+    azimuth -= 360.f;
+  } else if (azimuth <= -180.f) {
+    azimuth += 360.f;
+  }
+  return azimuth;
+}
+
 static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
                             const oar_metadata_t *metadata) {
   olr_context_t *olr = ctx->renderer;
@@ -186,8 +200,8 @@ static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
             metadata->duration > 0 ? metadata->duration : 0;
         olr->metadata_block_durations[i] += olr->metadata_blocks[i].duration;
 
-        olr->metadata_blocks[i].azimuth =
-            metadata->object_positions.polar_positions[i].azimuth;
+        olr->metadata_blocks[i].azimuth = __wrap_azimuth(
+            metadata->object_positions.polar_positions[i].azimuth);
         olr->metadata_blocks[i].elevation =
             metadata->object_positions.polar_positions[i].elevation;
         olr->metadata_blocks[i].distance =

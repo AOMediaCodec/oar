@@ -334,7 +334,11 @@ static int _vbap_panner_2d_calculate_gains(vbap_panner_2d_t *self,
     for (int j = 0; j < r; ++j) {
       speaker_position_t *sp =
           def_value_wrap_ptr(vector_at(self->target_speakers, j));
-      az_diff = nc_abs(sp->azimuth - azimuth);
+      // Circular distance: a linear difference is wrong whenever the true
+      // angular separation crosses the +/-180 seam (e.g. -170 vs +135 is
+      // 55 degrees apart, not 305).
+      az_diff = nc_fmod(nc_abs(sp->azimuth - azimuth), 360.0);
+      if (az_diff > 180.0) az_diff = 360.0 - az_diff;
       if (az_diff < min_diff) {
         min_diff = az_diff;
         closest_spk_idx = j;

@@ -24,6 +24,7 @@
 #define nc_arctan2 atan2
 #define nc_cos cos
 #define nc_sin sin
+#define nc_fmod fmod
 #else
 #define nc_abs fabsf
 #define nc_tan tanf
@@ -31,6 +32,7 @@
 #define nc_arctan2 atan2f
 #define nc_cos cosf
 #define nc_sin sinf
+#define nc_fmod fmodf
 #endif
 
 auto_float_t nc_radians(auto_float_t deg);
