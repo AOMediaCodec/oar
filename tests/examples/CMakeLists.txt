@@ -50,3 +50,13 @@ if(OAR_ENABLE_HOA_LFE)
     endif()
     set_property(TARGET test_hoa_lfe_rendering PROPERTY C_STANDARD 99)
 endif()
+
+# Register every example in this directory with ctest under the "oar" label
+# (mirroring the "obr" label in the obr subtree). Derived from the directory's
+# target list rather than a hardcoded list so new examples cannot be silently
+# left out of `ctest`.
+get_directory_property(OAR_EXAMPLE_TESTS BUILDSYSTEM_TARGETS)
+foreach(example_test IN LISTS OAR_EXAMPLE_TESTS)
+  add_test(NAME ${example_test} COMMAND ${example_test})
+  set_tests_properties(${example_test} PROPERTIES LABELS oar)
+endforeach()

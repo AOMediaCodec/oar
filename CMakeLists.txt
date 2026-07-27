@@ -3,6 +3,10 @@ cmake_minimum_required(VERSION 3.28)
 set(PROJECT_N oar)
 project(${PROJECT_N} VERSION 1.0.0)
 
+# Register tests from every subtree (obr unit tests, liboar examples) so a
+# single `ctest --test-dir build` covers them all.
+enable_testing()
+
 # Export all symbols when building oar as a DLL so an import library is
 # generated for the examples to link against.
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)

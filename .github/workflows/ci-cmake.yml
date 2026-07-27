@@ -36,14 +36,12 @@ jobs:
       - name: Build
         run: cmake --build build --parallel
 
-      - name: Run smoke tests
+      # PATH must include the build dir so the examples find oar.dll in the
+      # shared-library configuration on Windows. The label filter selects the
+      # oar examples and obr unit tests while skipping the tests that
+      # FetchContent'd dependencies (Eigen) register but never build.
+      - name: Run tests
         shell: bash
         run: |
           export PATH="$PWD/build:$PATH"
-          ./build/tests/examples/test_audio_element_types
-          ./build/tests/examples/test_channel_based_rendering
-          ./build/tests/examples/test_scene_based_rendering
-          ./build/tests/examples/test_object_based_rendering
-
-      - name: Run obr unit tests
-        run: ctest --test-dir build/src/renderer/obr/obr_capi/obr -L obr --output-on-failure
+          ctest --test-dir build -L 'oar|obr' --output-on-failure
