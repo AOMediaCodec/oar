@@ -280,6 +280,10 @@ add_executable(sample_type_conversion_test obr/ambisonic_binaural_decoder/tests/
 target_link_libraries(sample_type_conversion_test PRIVATE obr GTest::gtest_main)
 add_test(NAME sample_type_conversion_test COMMAND sample_type_conversion_test)
 
+add_executable(sh_hrir_creator_test obr/ambisonic_binaural_decoder/tests/sh_hrir_creator_test.cc)
+target_link_libraries(sh_hrir_creator_test PRIVATE obr GTest::gtest_main)
+add_test(NAME sh_hrir_creator_test COMMAND sh_hrir_creator_test)
+
 # Ambisonic encoder tests.
 add_executable(ambisonic_encoder_test obr/ambisonic_encoder/tests/ambisonic_encoder_test.cc)
 target_link_libraries(ambisonic_encoder_test PRIVATE test_util GTest::gtest_main)
@@ -337,6 +341,7 @@ set_tests_properties(
     planar_interleaved_conversion_test
     resampler_test
     sample_type_conversion_test
+    sh_hrir_creator_test
     ambisonic_encoder_test
     associated_legendre_polynomials_generator_test
     ambisonic_rotator_test
