@@ -126,7 +126,7 @@ TEST(ResamplerTest, DownSampleTest) {
 TEST(ResamplerTest, PassbandGainIsUnityAcrossRatePairs) {
   const std::pair<int, int> kRatePairs[] = {
       {44100, 48000},  {48000, 44100},  {88200, 48000}, {96000, 48000},
-      {176400, 48000}, {192000, 48000}, {48000, 96000}};
+      {176400, 48000}, {192000, 48000}, {48000, 96000}, {48000, 32000}};
   for (const auto& rates : kRatePairs) {
     const int source_rate = rates.first;
     const int destination_rate = rates.second;
@@ -166,9 +166,12 @@ TEST(ResamplerTest, PassbandGainIsUnityAcrossRatePairs) {
 // not folded back into the output band.
 TEST(ResamplerTest, DownsamplingAttenuatesAboveDestinationNyquist) {
   // {source_rate, destination_rate, tone_frequency}; each tone sits at 1.5x
-  // the destination Nyquist frequency.
-  const int kCases[][3] = {
-      {96000, 48000, 36000}, {192000, 48000, 72000}, {88200, 44100, 33000}};
+  // the destination Nyquist frequency. The 88.2k->48k pair covers a
+  // non-integer downsampling factor (1.8375).
+  const int kCases[][3] = {{96000, 48000, 36000},
+                           {192000, 48000, 72000},
+                           {88200, 44100, 33000},
+                           {88200, 48000, 36000}};
   for (const auto& test_case : kCases) {
     const int source_rate = test_case[0];
     const int destination_rate = test_case[1];
