@@ -127,16 +127,21 @@ void Resampler::Process(const AudioBuffer& input, AudioBuffer* output) {
   const int samples_left_in_input =
       static_cast<int>(coeffs_per_phase_) - 1 - static_cast<int>(input_length);
   if (samples_left_in_input > 0) {
+    // The live state occupies the first `coeffs_per_phase_` - 1 frames of the
+    // (larger, preallocated) `state_` buffer, so it must be addressed relative
+    // to begin(), not end(). Shift the old state down by `input_length` and
+    // append the entire input, keeping the most recent input samples in
+    // chronological order.
+    const size_t state_num_frames = coeffs_per_phase_ - 1;
     for (size_t channel = 0; channel < num_channels_; ++channel) {
-      // Copy end of the `state_` buffer to the beginning.
       auto& state_channel = state_[channel];
       ABSL_DCHECK_GE(static_cast<int>(state_channel.size()),
                      samples_left_in_input);
-      std::copy_n(state_channel.end() - samples_left_in_input,
-                  samples_left_in_input, state_channel.begin());
-      // Then copy input to the end of the buffer.
+      std::copy(state_channel.begin() + input_length,
+                state_channel.begin() + state_num_frames,
+                state_channel.begin());
       std::copy_n(input[channel].begin(), input_length,
-                  state_channel.end() - input_length);
+                  state_channel.begin() + (state_num_frames - input_length));
     }
   } else {
     for (size_t channel = 0; channel < num_channels_; ++channel) {
@@ -269,9 +274,14 @@ void Resampler::GenerateInterpolatingFilter(int sample_rate) {
                      filter_length, filter_channel);
 
   // Pad out the filter length so that it can be arranged in polyphase fashion.
+  // The polyphase decomposition has |up_rate_| branches, so the per-branch
+  // length must be derived from |up_rate_|. Deriving it from |max_rate| (as
+  // previously done) silently dropped the tail of the filter whenever
+  // down_rate_ > up_rate_, causing rate-dependent gain errors (e.g. -2.5 dB at
+  // 96k->48k, -35 dB at 192k->48k) and degraded anti-aliasing.
   const size_t transposed_length =
-      filter_length + max_rate - (filter_length % max_rate);
-  coeffs_per_phase_ = transposed_length / max_rate;
+      filter_length + up_rate_ - (filter_length % up_rate_);
+  coeffs_per_phase_ = transposed_length / up_rate_;
   ArrangeFilterAsPolyphase(filter_length, *filter_channel);
 }
 

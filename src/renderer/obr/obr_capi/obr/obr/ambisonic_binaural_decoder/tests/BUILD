@@ -82,3 +82,14 @@ cc_test(
         "@com_google_googletest//:gtest_main",
     ],
 )
+
+cc_test(
+    name = "sh_hrir_creator_test",
+    srcs = ["sh_hrir_creator_test.cc"],
+    deps = [
+        "//obr/ambisonic_binaural_decoder:resampler",
+        "//obr/ambisonic_binaural_decoder:sh_hrir_creator",
+        "//obr/audio_buffer",
+        "@com_google_googletest//:gtest_main",
+    ],
+)

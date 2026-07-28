@@ -101,6 +101,7 @@ cc_library(
         ":wav",
         "//obr/ambisonic_binaural_decoder/binaural_filters:binaural_filters_wrapper",
         "//obr/audio_buffer",
+        "//obr/audio_buffer:simd_utils",
         "//obr/common",
         "@abseil-cpp//absl/log:absl_check",
         "@abseil-cpp//absl/log:absl_log",
