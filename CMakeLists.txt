@@ -18,6 +18,8 @@ option(OAR_AUDIO_SIGNAL_DEBUG
 
 option(OLR_ENABLE_F64 "Enable double precision support for olr" OFF)
 option(OAR_BUILD_EXAMPLES "Build examples" OFF)
+option(OAR_ENABLE_HOA_LFE
+        "Generate the LFE channel when rendering HOA to loudspeakers" OFF)
 
 if(OLR_ENABLE_F64)
     add_definitions(-DENABLE_F64)
@@ -29,6 +31,11 @@ endif()
 if (OAR_AUDIO_SIGNAL_DEBUG)
     message(STATUS "Audio signal debug.")
     add_definitions(-D__as_dbg__)
+endif()
+
+if(OAR_ENABLE_HOA_LFE)
+    message(STATUS "HOA-to-loudspeakers LFE generation enabled.")
+    add_definitions(-DDISABLE_LFE_HOA=0)
 endif()
 
 if(OAR_ENABLE_BINAURALIZER)

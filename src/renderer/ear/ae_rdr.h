@@ -222,9 +222,11 @@ int IAMF_element_renderer_get_H2M_matrix(IAMF_HOA_LAYOUT *in,
  * @param     [in] out : the pcm signal of output
  * @param     [in] nsamples : the processed samples of pcm signal.
  * @param     [in] lfe : the filter to prcoess lfe channel.
+ * @param     [in] sample_rate : the sampling rate of the pcm signal, used to
+ *                 initialize the lfe filter if it is not initialized yet.
  * @return    @0: success,@others: fail
  */
 int IAMF_element_renderer_render_H2M(struct h2m_rdr_t *h2mMatrix, float *in[],
                                      float *out[], int nsamples,
-                                     lfe_filter_t *lfe);
+                                     lfe_filter_t *lfe, uint32_t sample_rate);
 #endif

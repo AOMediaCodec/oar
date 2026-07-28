@@ -2359,13 +2359,14 @@ int IAMF_element_renderer_get_H2M_matrix(IAMF_HOA_LAYOUT *in,
 }
 
 #if DISABLE_LFE_HOA == 0
-static float lfefilter_update(lfe_filter_t *lfe_f, float input);
+static float lfefilter_update(lfe_filter_t *lfe_f, float input,
+                              uint32_t sample_rate);
 #endif
 
 // HOA to Multichannel Renderer
 int IAMF_element_renderer_render_H2M(struct h2m_rdr_t *h2mMatrix, float *in[],
                                      float *out[], int nsamples,
-                                     lfe_filter_t *lfe) {
+                                     lfe_filter_t *lfe, uint32_t sample_rate) {
   int i, j, n;
   int n_size = h2mMatrix->n;
 
@@ -2425,7 +2426,7 @@ int IAMF_element_renderer_render_H2M(struct h2m_rdr_t *h2mMatrix, float *in[],
       for (j = 0; j < nsamples; j++) {
         if (lfe) {  // compute lfe
           float output;
-          output = lfefilter_update(lfe, in[0][j]);  // use W
+          output = lfefilter_update(lfe, in[0][j], sample_rate);  // use W
           if (n_size <= 2)
             out[lfe1][j] = output * 0.5;
           else
@@ -2443,7 +2444,7 @@ int IAMF_element_renderer_render_H2M(struct h2m_rdr_t *h2mMatrix, float *in[],
             out[lfe2][j] = out[lfe1][j];
           } else {  // compute lfe
             float output;
-            output = lfefilter_update(lfe, in[0][j]);  // use W
+            output = lfefilter_update(lfe, in[0][j], sample_rate);  // use W
             if (n_size <= 2)
               out[lfe2][j] = output * 0.5;
             else
@@ -2482,12 +2483,15 @@ void lfefilter_init(lfe_filter_t *lfe_f, float cutoff_freq, float sample_rate) {
   memset(lfe_f->output_history, 0, sizeof(lfe_f->output_history));
 }
 
-#define DEFAULT_SAMPLERATE 48000.0f
-static float lfefilter_update(lfe_filter_t *lfe_f, float input) {
+static float lfefilter_update(lfe_filter_t *lfe_f, float input,
+                              uint32_t sample_rate) {
   float output;
 
   if (lfe_f->init != 1) {
-    lfefilter_init(lfe_f, 120, DEFAULT_SAMPLERATE);
+    // Fallback for callers that did not initialize the filter eagerly; the
+    // cutoff coefficients must be computed for the actual signal rate, not a
+    // hardcoded one, or the effective cutoff scales with the output rate.
+    lfefilter_init(lfe_f, 120, (float)sample_rate);
   }
   output = lfe_f->a1 * input + lfe_f->a2 * lfe_f->input_history[0] +
            lfe_f->a3 * lfe_f->input_history[1] -
