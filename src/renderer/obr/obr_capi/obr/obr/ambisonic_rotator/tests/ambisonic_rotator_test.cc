@@ -13,6 +13,7 @@
 #include "obr/ambisonic_rotator/ambisonic_rotator.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <tuple>
@@ -207,6 +208,165 @@ INSTANTIATE_TEST_SUITE_P(
     Values(TestParams({1.0f, 0.0f, 0.0f}, kXrotatedSourceAngle),
            TestParams({0.0f, 1.0f, 0.0f}, kYrotatedSourceAngle),
            TestParams({0.0f, 0.0f, 1.0f}, kZrotatedSourceAngle)));
+
+// A rotation set before any audio has been processed must be applied in full
+// from the very first frame, with no slerp from the initial identity rotation.
+TEST_F(AmbisonicRotatorTest, FirstProcessedBlockAppliesTargetRotationInFull) {
+  const size_t kFramesPerBuffer = 2 * kSlerpFrameInterval;
+  const size_t kNumThirdOrderAmbisonicChannels = 16;
+  const std::vector<float> kInputData(kFramesPerBuffer, 1.0f);
+  AudioBuffer input_buffer(1, kFramesPerBuffer);
+  FillAudioBuffer(kInputData, 1, &input_buffer);
+
+  // Soundfield with a source at the initial angle, to be rotated.
+  AmbisonicEncoder source_mono_codec(1, kAmbisonicOrder);
+  source_mono_codec.SetSource(
+      0, 1.0f, kInitialSourceAngle.azimuth() * kDegreesFromRadians,
+      kInitialSourceAngle.elevation() * kDegreesFromRadians, 1.0f);
+  AudioBuffer encoded_buffer(kNumThirdOrderAmbisonicChannels, kFramesPerBuffer);
+  source_mono_codec.ProcessPlanarAudioData(input_buffer, &encoded_buffer);
+
+  // Reference soundfield with the source already at the rotated angle.
+  AmbisonicEncoder reference_mono_codec(1, kAmbisonicOrder);
+  reference_mono_codec.SetSource(
+      0, 1.0f, kZrotatedSourceAngle.azimuth() * kDegreesFromRadians,
+      kZrotatedSourceAngle.elevation() * kDegreesFromRadians, 1.0f);
+  AudioBuffer reference_buffer(kNumThirdOrderAmbisonicChannels,
+                               kFramesPerBuffer);
+  reference_mono_codec.ProcessPlanarAudioData(input_buffer, &reference_buffer);
+
+  const WorldRotation rotation = WorldRotation(AngleAxisf(
+      kAngleDegrees * kRadiansFromDegrees, WorldPosition(0.0f, 0.0f, 1.0f)));
+
+  hoa_rotator_ = std::make_unique<AmbisonicRotator>(kAmbisonicOrder);
+  EXPECT_TRUE(
+      hoa_rotator_->Process(rotation, encoded_buffer, &encoded_buffer));
+
+  // Every frame of the first processed block, including the first slerp
+  // interval, must match the fully rotated reference.
+  for (size_t channel = 0; channel < encoded_buffer.num_channels();
+       ++channel) {
+    for (size_t frame = 0; frame < kFramesPerBuffer; ++frame) {
+      EXPECT_NEAR(encoded_buffer[channel][frame],
+                  reference_buffer[channel][frame], kEpsilonFloat);
+    }
+  }
+}
+
+// If audio has been rendered without the rotator (head tracking disabled),
+// the unrotated scene was audible, so a later rotation must still slerp from
+// identity across the block instead of being applied in full.
+TEST_F(AmbisonicRotatorTest, RotationAfterBypassedBlocksStillSlerps) {
+  const size_t kFramesPerBuffer = 2 * kSlerpFrameInterval;
+  const size_t kNumThirdOrderAmbisonicChannels = 16;
+  const std::vector<float> kInputData(kFramesPerBuffer, 1.0f);
+  AudioBuffer input_buffer(1, kFramesPerBuffer);
+  FillAudioBuffer(kInputData, 1, &input_buffer);
+
+  AmbisonicEncoder source_mono_codec(1, kAmbisonicOrder);
+  source_mono_codec.SetSource(
+      0, 1.0f, kInitialSourceAngle.azimuth() * kDegreesFromRadians,
+      kInitialSourceAngle.elevation() * kDegreesFromRadians, 1.0f);
+  AudioBuffer encoded_buffer(kNumThirdOrderAmbisonicChannels, kFramesPerBuffer);
+  source_mono_codec.ProcessPlanarAudioData(input_buffer, &encoded_buffer);
+
+  // Reference soundfield with the source already at the rotated angle.
+  AmbisonicEncoder reference_mono_codec(1, kAmbisonicOrder);
+  reference_mono_codec.SetSource(
+      0, 1.0f, kZrotatedSourceAngle.azimuth() * kDegreesFromRadians,
+      kZrotatedSourceAngle.elevation() * kDegreesFromRadians, 1.0f);
+  AudioBuffer reference_buffer(kNumThirdOrderAmbisonicChannels,
+                               kFramesPerBuffer);
+  reference_mono_codec.ProcessPlanarAudioData(input_buffer, &reference_buffer);
+
+  const WorldRotation rotation = WorldRotation(AngleAxisf(
+      kAngleDegrees * kRadiansFromDegrees, WorldPosition(0.0f, 0.0f, 1.0f)));
+
+  hoa_rotator_ = std::make_unique<AmbisonicRotator>(kAmbisonicOrder);
+
+  // Blocks were rendered with the rotator bypassed (head tracking disabled).
+  hoa_rotator_->MarkAudioRendered();
+
+  AudioBuffer rotated_buffer(kNumThirdOrderAmbisonicChannels, kFramesPerBuffer);
+  EXPECT_TRUE(
+      hoa_rotator_->Process(rotation, encoded_buffer, &rotated_buffer));
+
+  float max_first_interval_difference = 0.0f;
+  for (size_t channel = 0; channel < rotated_buffer.num_channels();
+       ++channel) {
+    // The last slerp interval has undergone the full rotation.
+    for (size_t frame = kFramesPerBuffer - kSlerpFrameInterval;
+         frame < kFramesPerBuffer; ++frame) {
+      EXPECT_NEAR(rotated_buffer[channel][frame],
+                  reference_buffer[channel][frame], kEpsilonFloat);
+    }
+    // Track how far the first slerp interval is from the full rotation.
+    for (size_t frame = 0; frame < kSlerpFrameInterval; ++frame) {
+      max_first_interval_difference = std::max(
+          max_first_interval_difference,
+          std::abs(rotated_buffer[channel][frame] -
+                   reference_buffer[channel][frame]));
+    }
+  }
+  // The first slerp interval must still be part-way through the rotation.
+  EXPECT_GT(max_first_interval_difference, 0.01f);
+}
+
+// Once audio has been processed, rotation changes must still be smoothed
+// across the next block: the block ends at the new rotation but does not
+// start there.
+TEST_F(AmbisonicRotatorTest, RotationChangeAfterFirstBlockStillSlerps) {
+  const size_t kFramesPerBuffer = 2 * kSlerpFrameInterval;
+  const size_t kNumThirdOrderAmbisonicChannels = 16;
+  const std::vector<float> kInputData(kFramesPerBuffer, 1.0f);
+  AudioBuffer input_buffer(1, kFramesPerBuffer);
+  FillAudioBuffer(kInputData, 1, &input_buffer);
+
+  AmbisonicEncoder source_mono_codec(1, kAmbisonicOrder);
+  source_mono_codec.SetSource(
+      0, 1.0f, kInitialSourceAngle.azimuth() * kDegreesFromRadians,
+      kInitialSourceAngle.elevation() * kDegreesFromRadians, 1.0f);
+  AudioBuffer encoded_buffer(kNumThirdOrderAmbisonicChannels, kFramesPerBuffer);
+  source_mono_codec.ProcessPlanarAudioData(input_buffer, &encoded_buffer);
+
+  const WorldRotation rotation = WorldRotation(AngleAxisf(
+      kAngleDegrees * kRadiansFromDegrees, WorldPosition(0.0f, 0.0f, 1.0f)));
+
+  hoa_rotator_ = std::make_unique<AmbisonicRotator>(kAmbisonicOrder);
+
+  // First block: rotation applied in full (snap).
+  AudioBuffer rotated_buffer(kNumThirdOrderAmbisonicChannels, kFramesPerBuffer);
+  EXPECT_TRUE(
+      hoa_rotator_->Process(rotation, encoded_buffer, &rotated_buffer));
+
+  // Second block: return to identity. The output must end as the unrotated
+  // input (slerp completed) but must not start there (still mid-slerp).
+  AudioBuffer transition_buffer(kNumThirdOrderAmbisonicChannels,
+                                kFramesPerBuffer);
+  EXPECT_TRUE(hoa_rotator_->Process(WorldRotation(), encoded_buffer,
+                                    &transition_buffer));
+
+  float max_first_interval_difference = 0.0f;
+  for (size_t channel = 0; channel < transition_buffer.num_channels();
+       ++channel) {
+    // The last slerp interval has undergone the full rotation back to
+    // identity, so it must match the unrotated input.
+    for (size_t frame = kFramesPerBuffer - kSlerpFrameInterval;
+         frame < kFramesPerBuffer; ++frame) {
+      EXPECT_NEAR(transition_buffer[channel][frame],
+                  encoded_buffer[channel][frame], kEpsilonFloat);
+    }
+    // Track how far the first slerp interval is from the unrotated input.
+    for (size_t frame = 0; frame < kSlerpFrameInterval; ++frame) {
+      max_first_interval_difference = std::max(
+          max_first_interval_difference,
+          std::abs(transition_buffer[channel][frame] -
+                   encoded_buffer[channel][frame]));
+    }
+  }
+  // The first slerp interval must still be part-way through the rotation.
+  EXPECT_GT(max_first_interval_difference, 0.01f);
+}
 
 }  // namespace
 
