@@ -182,6 +182,11 @@ void ProcessingGroup::Process(
     // Pass world-locked Ambisonic mix bed through Ambisonic Rotator.
     ambisonic_rotator_->Process(world_rotation, ambisonic_mix_bed_,
                                 &ambisonic_mix_bed_);
+  } else {
+    // The block is rendered unrotated; let the rotator know so a later
+    // rotation change slerps from the audible identity rotation instead of
+    // snapping.
+    ambisonic_rotator_->MarkAudioRendered();
   }
 
   // Sum both beds: combine world-locked (possibly rotated) and head-locked.
