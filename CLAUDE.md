@@ -19,13 +19,13 @@ Eclipsa's engine consumes OAR+OBR as a Bazel module. Upstream ships a CMake-only
 
 ### Bug fixes pending upstreaming
 
-These are merged into our `main` and also pushed as branches on `AOMediaCodec/oar` (pending review/merge upstream). Once upstream merges them, a sync should reduce them to no-ops.
+These are merged into our `main` and kept as `fix/*` branches on this fork (not yet submitted upstream). Once upstream merges them, a sync should reduce them to no-ops.
 
-- `fix/arm-neon-matrix-render-stub` — `src/renderer/ear/arch/arm/matrix_render_arm.c`: adds `#include "matrix_render.h"` before the `#if defined(def_oar_arch_arm)` guard. Without it, `def_oar_arch_arm` (derived from `__ARM_NEON` in that header) is undefined in this translation unit and `multiply_channels_by_matrix_neon()` is preprocessed away to an empty stub — every matrix render (multichannel downmix M2M and HOA-to-loudspeaker H2M) is silent on ARM; only native-layout passthrough works. x86 is unaffected (scalar C `#else` path); OBR's HRIR binaural path doesn't use this renderer.
-- `fix/obr-resampler-shhrir-dsp` — `src/renderer/obr/obr_capi/obr/obr/ambisonic_binaural_decoder/`, with tests:
-  - `resampler.cc` — polyphase partition derived from `up_rate_` (downsampling gain/anti-aliasing errors) and `begin()`-relative state addressing for short input blocks.
-  - `sh_hrir_creator.cc` — resampled HRIRs scaled by `wav_rate/target_rate` so binaural loudness is invariant to the output rate (fixed the louder-at-96k bug).
-- `fix/lfe-filter-sample-rate` — LFE low-pass filter used a hardcoded 48 kHz sample rate; with test `tests/examples/test_hoa_lfe_rendering.c`.
+- `fix/olr-azimuth-wrapping` — `src/renderer/olr/`: wraps out-of-range object azimuths and uses circular closest-speaker distance in OLR; with test `tests/examples/test_object_azimuth_wrapping.c`.
+- `fix/register-example-tests-ctest` — registers the liboar example tests with ctest (`enable_testing()` at the root, `add_test()` entries, CI runs them via `ctest -L`).
+- `fix/ear-dangling-layout-pointer` — `src/renderer/ear/ear.c`: clears a stack-local output-layout pointer before `_open` returns so it can't dangle.
+
+Previously listed here and since merged upstream (now plain upstream history): the ARM NEON matrix-render include fix, the OBR resampler/`sh_hrir_creator` DSP fixes, and the LFE filter sample-rate fix.
 
 ## Syncing with upstream
 
