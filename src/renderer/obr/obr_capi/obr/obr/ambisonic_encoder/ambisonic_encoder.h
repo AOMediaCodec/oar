@@ -129,6 +129,12 @@ class AmbisonicEncoder {
   // Map of structs containing the properties of each source.
   absl::flat_hash_map<size_t, SourceProperties> sources_;
 
+  // False until the first call to `ProcessPlanarAudioData()`. While false,
+  // `SetSource()` snaps `current` to `target` instead of scheduling a ramp:
+  // no audio has been rendered yet, so there is no previously audible
+  // position to interpolate from.
+  bool has_processed_ = false;
+
   AssociatedLegendrePolynomialsGenerator alp_generator_;
   Eigen::MatrixXf encoding_matrix_;
 };
