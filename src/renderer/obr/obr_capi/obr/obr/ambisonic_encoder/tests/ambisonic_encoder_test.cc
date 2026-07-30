@@ -99,5 +99,83 @@ TEST(AmbisonicEncoderTest, TestOneSampleBufferOneSource) {
   }
 }
 
+// A source position set after the source was created but before any audio
+// has been processed must take effect from the very first frame, with no
+// ramp from the previously set (e.g. default) position.
+TEST(AmbisonicEncoderTest, PreRenderPositionUpdateTakesEffectImmediately) {
+  const size_t buffer_size = 64;
+  const int number_of_input_channels = 1;
+  const int ambisonic_order = 1;
+
+  const float kEpsilon = 1e-6;
+
+  AmbisonicEncoder encoder(number_of_input_channels, ambisonic_order);
+
+  // Source is first registered at the default front position, then moved to
+  // hard left before any processing (mirrors an element being added and its
+  // metadata updated before the first render call).
+  encoder.SetSource(0, 1.0f, 0.0f, 0.0f, 1.0f);
+  encoder.SetSource(0, 1.0f, 90.0f, 0.0f, 1.0f);
+
+  AudioBuffer input_buffer(number_of_input_channels, buffer_size);
+  for (float& sample : input_buffer[0]) {
+    sample = 1.0f;
+  }
+
+  AudioBuffer output_buffer(GetNumPeriphonicComponents(ambisonic_order),
+                            buffer_size);
+  encoder.ProcessPlanarAudioData(input_buffer, &output_buffer);
+
+  // First-order ACN/SN3D coefficients for azimuth 90, elevation 0:
+  // ACN0 = 1, ACN1 = 1, ACN2 = 0, ACN3 = 0. Every frame of the block,
+  // including the first, must carry these coefficients.
+  const std::vector<float> expected_coefficients = {1.0f, 1.0f, 0.0f, 0.0f};
+  for (auto ch = 0; ch < output_buffer.num_channels(); ch++) {
+    for (float sample : output_buffer[ch]) {
+      EXPECT_NEAR(sample, expected_coefficients[ch], kEpsilon);
+    }
+  }
+}
+
+// Once audio has been processed, position updates must still ramp across the
+// next block to avoid clicks: the block starts at the previously audible
+// position and ends at the new one.
+TEST(AmbisonicEncoderTest, PostRenderPositionUpdateRampsAcrossBlock) {
+  const size_t buffer_size = 64;
+  const int number_of_input_channels = 1;
+  const int ambisonic_order = 1;
+
+  const float kEpsilon = 1e-6;
+
+  AmbisonicEncoder encoder(number_of_input_channels, ambisonic_order);
+  encoder.SetSource(0, 1.0f, 0.0f, 0.0f, 1.0f);
+
+  AudioBuffer input_buffer(number_of_input_channels, buffer_size);
+  for (float& sample : input_buffer[0]) {
+    sample = 1.0f;
+  }
+
+  AudioBuffer output_buffer(GetNumPeriphonicComponents(ambisonic_order),
+                            buffer_size);
+
+  // First block renders the source at the front.
+  encoder.ProcessPlanarAudioData(input_buffer, &output_buffer);
+
+  // Move the source to hard left and render another block.
+  encoder.SetSource(0, 1.0f, 90.0f, 0.0f, 1.0f);
+  encoder.ProcessPlanarAudioData(input_buffer, &output_buffer);
+
+  // First-order ACN/SN3D coefficients (ACN0..ACN3): front is {1, 0, 0, 1},
+  // hard left is {1, 1, 0, 0}. The block must start at the front and end
+  // hard left.
+  const std::vector<float> front_coefficients = {1.0f, 0.0f, 0.0f, 1.0f};
+  const std::vector<float> left_coefficients = {1.0f, 1.0f, 0.0f, 0.0f};
+  for (auto ch = 0; ch < output_buffer.num_channels(); ch++) {
+    EXPECT_NEAR(output_buffer[ch][0], front_coefficients[ch], kEpsilon);
+    EXPECT_NEAR(output_buffer[ch][buffer_size - 1], left_coefficients[ch],
+                kEpsilon);
+  }
+}
+
 }  // namespace
 }  // namespace obr
