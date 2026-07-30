@@ -44,6 +44,15 @@ class AmbisonicRotator {
   bool Process(const WorldRotation& target_rotation, const AudioBuffer& input,
                AudioBuffer* output);
 
+  /*!\brief Records that a block of audio was rendered without this rotator
+   * (e.g. with head tracking disabled).
+   *
+   * The unrotated scene was audible, so a later rotation change slerps from
+   * `current_rotation_` instead of being snapped as on the first processed
+   * block.
+   */
+  void MarkAudioRendered() { has_processed_ = true; }
+
  private:
   /*!\brief Updates the rotation matrix with using supplied WorldRotation.
    *
@@ -57,6 +66,12 @@ class AmbisonicRotator {
   // Current rotation which is used in the interpolation process in order to
   // compute new rotation matrix. Initialized with an identity rotation.
   WorldRotation current_rotation_;
+
+  // False until the first call to `Process()`. While false, the target
+  // rotation is applied from the first frame instead of slerping from
+  // `current_rotation_`: no audio has been rendered yet, so there is no
+  // previously audible rotation to interpolate from.
+  bool has_processed_ = false;
 
   // Spherical harmonics rotation sub-matrices for each order.
   std::vector<Eigen::MatrixXf> rotation_matrices_;
