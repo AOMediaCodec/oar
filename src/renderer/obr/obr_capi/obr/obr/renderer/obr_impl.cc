@@ -422,14 +422,24 @@ absl::Status ObrImpl::UpdateObjectChannelPosition(size_t audio_element_index,
 }
 
 void ObrImpl::EnableHeadTracking(bool enable_head_tracking) {
+  // Acquire mutex: `head_tracking_enabled_` is read by `Process()` on the
+  // audio thread.
+  absl::MutexLock lock(&mutex_);
   head_tracking_enabled_ = enable_head_tracking;
 }
 
 void ObrImpl::EnableLimiter(bool enable_limiter) {
+  // Acquire mutex: `limiter_enabled_` is read by `Process()` on the audio
+  // thread.
+  absl::MutexLock lock(&mutex_);
   limiter_enabled_ = enable_limiter;
 }
 
 absl::Status ObrImpl::SetHeadRotation(float w, float x, float y, float z) {
+  // Acquire mutex: `world_rotation_` is read by `Process()` on the audio
+  // thread, and head rotation updates typically arrive from a sensor thread.
+  absl::MutexLock lock(&mutex_);
+
   // Apply counter-rotation for head tracking.
   world_rotation_ = WorldRotation(w, -x, -y, -z);
 
