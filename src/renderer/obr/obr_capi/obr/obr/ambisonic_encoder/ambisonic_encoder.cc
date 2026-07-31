@@ -77,6 +77,15 @@ void AmbisonicEncoder::SetSource(size_t input_channel, float gain,
   source_properties.target.elevation = elevation;
   source_properties.target.distance = distance;
 
+  // Before any audio has been rendered there is no previously audible
+  // position to ramp from, so snap to the new parameters. This makes
+  // metadata applied before the first processed block take effect
+  // immediately (matching loudspeaker rendering) instead of gliding in
+  // from the initial position over the first block.
+  if (!has_processed_) {
+    source_properties.current = source_properties.target;
+  }
+
   // If target gain indicates silence, mute the static encoding matrix column
   // as a quick early-out for any code that may still use it.
   if (gain < kNegative120dbInAmplitude) {
@@ -304,6 +313,10 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
   // Update the stored encoding matrix to the last frame's matrix so code that
   // expects a static encoding matrix still has a reasonable value.
   encoding_matrix_ = last_encoding;
+
+  // Audio has now been rendered; subsequent `SetSource()` updates ramp from
+  // the previously audible parameters.
+  has_processed_ = true;
 }
 
 void AmbisonicEncoder::GetShCoeffs(float azimuth, float elevation,

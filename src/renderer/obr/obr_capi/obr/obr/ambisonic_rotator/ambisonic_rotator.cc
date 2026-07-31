@@ -203,6 +203,19 @@ bool AmbisonicRotator::Process(const WorldRotation& target_rotation,
 
   static const WorldRotation kIdentityRotation;
 
+  // Before any audio has been rendered there is no previously audible
+  // rotation to slerp from, so snap to the target: a head pose set ahead of
+  // the first processed block takes effect from the first frame instead of
+  // gliding in from the initial identity rotation.
+  if (!has_processed_) {
+    has_processed_ = true;
+    if (current_rotation_.AngularDifferenceRad(target_rotation) >=
+        kRotationQuantizationRad) {
+      current_rotation_ = target_rotation;
+      UpdateRotationMatrix(current_rotation_);
+    }
+  }
+
   if (current_rotation_.AngularDifferenceRad(kIdentityRotation) <
           kRotationQuantizationRad &&
       target_rotation.AngularDifferenceRad(kIdentityRotation) <
