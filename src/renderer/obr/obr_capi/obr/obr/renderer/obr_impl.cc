@@ -12,6 +12,7 @@
 
 #include "obr/renderer/obr_impl.h"
 
+#include <atomic>
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -40,7 +41,6 @@ ObrImpl::ObrImpl(int buffer_size_per_channel, int sampling_rate)
       sampling_rate_(sampling_rate),
       head_tracking_enabled_(false),
       limiter_enabled_(true),
-      world_rotation_(WorldRotation()),
       fft_manager_(buffer_size_per_channel_) {
   ABSL_CHECK_GT(buffer_size_per_channel, 0)
       << "Buffer size per channel must be greater than 0.";
@@ -144,7 +144,25 @@ void ObrImpl::Process(const AudioBuffer& input_buffer,
   ABSL_CHECK_EQ(output_buffer->num_channels(), GetNumberOfOutputChannels());
   ABSL_CHECK_EQ(output_buffer->num_frames(), buffer_size_per_channel_);
 
-  // Acquire the lock for the entire processing duration.
+  // Latch the control state once, before anything else, so that this block is
+  // rendered against a single consistent set of values. Reading it here rather
+  // than partway through also matches what the rotation interpolation in
+  // `ProcessingGroup` expects: one rotation per buffer, not one that can
+  // change while the buffer is being built.
+  //
+  // None of these reads can block. `last_world_rotation_` is touched only from
+  // this thread, and stands in for the published rotation on the rare occasion
+  // that an update is in flight for the whole of the read.
+  const bool head_tracking_enabled =
+      head_tracking_enabled_.load(std::memory_order_relaxed);
+  const bool limiter_enabled = limiter_enabled_.load(std::memory_order_relaxed);
+  const WorldRotation world_rotation =
+      world_rotation_.Load(last_world_rotation_);
+  last_world_rotation_ = world_rotation;
+
+  // Acquire the lock for the entire processing duration. This guards the
+  // audio element and processing group collections against reconfiguration;
+  // the control state latched above is deliberately outside it.
   absl::MutexLock lock(&mutex_);
 
   // Clear the output buffer.
@@ -197,7 +215,7 @@ void ObrImpl::Process(const AudioBuffer& input_buffer,
   // (May still have passthrough elements processed above.)
   if (processing_groups_.empty()) {
     // Apply peak limiter even for passthrough-only configurations.
-    if (limiter_enabled_) {
+    if (limiter_enabled) {
       peak_limiter_->Process(*output_buffer, output_buffer);
     }
     return;
@@ -209,8 +227,8 @@ void ObrImpl::Process(const AudioBuffer& input_buffer,
   // Process each processing group.
   for (auto& group : processing_groups_) {
     group_output.Clear();
-    group.Process(input_buffer, audio_elements_, head_tracking_enabled_,
-                  world_rotation_, &group_output);
+    group.Process(input_buffer, audio_elements_, head_tracking_enabled,
+                  world_rotation, &group_output);
 
     // Add this group's binaural output to the main output buffer.
     (*output_buffer)[0] += group_output[0];
@@ -218,7 +236,7 @@ void ObrImpl::Process(const AudioBuffer& input_buffer,
   }
 
   // Peak limit the output if enabled.
-  if (limiter_enabled_) {
+  if (limiter_enabled) {
     peak_limiter_->Process(*output_buffer, output_buffer);
   }
 }
@@ -422,26 +440,22 @@ absl::Status ObrImpl::UpdateObjectChannelPosition(size_t audio_element_index,
 }
 
 void ObrImpl::EnableHeadTracking(bool enable_head_tracking) {
-  // Acquire mutex: `head_tracking_enabled_` is read by `Process()` on the
-  // audio thread.
-  absl::MutexLock lock(&mutex_);
-  head_tracking_enabled_ = enable_head_tracking;
+  // Published without a lock: `Process()` reads this on the audio thread and
+  // must not be able to wait on a control thread. See `obr_impl.h`.
+  head_tracking_enabled_.store(enable_head_tracking, std::memory_order_relaxed);
 }
 
 void ObrImpl::EnableLimiter(bool enable_limiter) {
-  // Acquire mutex: `limiter_enabled_` is read by `Process()` on the audio
-  // thread.
-  absl::MutexLock lock(&mutex_);
-  limiter_enabled_ = enable_limiter;
+  limiter_enabled_.store(enable_limiter, std::memory_order_relaxed);
 }
 
 absl::Status ObrImpl::SetHeadRotation(float w, float x, float y, float z) {
-  // Acquire mutex: `world_rotation_` is read by `Process()` on the audio
-  // thread, and head rotation updates typically arrive from a sensor thread.
-  absl::MutexLock lock(&mutex_);
-
+  // Published without a lock. Head rotation typically arrives from a sensor
+  // thread at a steady rate while `Process()` renders, so this is the one
+  // control path that would contend with the audio thread on every buffer.
+  //
   // Apply counter-rotation for head tracking.
-  world_rotation_ = WorldRotation(w, -x, -y, -z);
+  world_rotation_.Store(WorldRotation(w, -x, -y, -z));
 
   return absl::OkStatus();
 }

@@ -154,6 +154,7 @@ set(SourceFiles
         obr/audio_buffer/simd_utils.cc
         obr/audio_buffer/simd_utils.h
         obr/common/ambisonic_utils.h
+        obr/common/atomic_rotation.h
         obr/common/constants.h
         obr/common/status_macros.h
         obr/common/misc_math.h
@@ -314,6 +315,10 @@ add_test(NAME spherical_angle_test COMMAND spherical_angle_test)
 add_executable(ambisonic_utils_test obr/common/tests/ambisonic_utils_test.cc)
 target_link_libraries(ambisonic_utils_test PRIVATE obr GTest::gtest_main)
 add_test(NAME ambisonic_utils_test COMMAND ambisonic_utils_test)
+
+add_executable(atomic_rotation_test obr/common/tests/atomic_rotation_test.cc)
+target_link_libraries(atomic_rotation_test PRIVATE obr GTest::gtest_main)
+add_test(NAME atomic_rotation_test COMMAND atomic_rotation_test)
 
 add_executable(misc_math_test obr/common/tests/misc_math_test.cc)
 target_link_libraries(misc_math_test PRIVATE obr GTest::gtest_main)
