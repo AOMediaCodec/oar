@@ -10,6 +10,15 @@ cc_test(
 )
 
 cc_test(
+    name = "atomic_rotation_test",
+    srcs = ["atomic_rotation_test.cc"],
+    deps = [
+        "//obr/common",
+        "@com_google_googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "misc_math_test",
     srcs = ["misc_math_test.cc"],
     deps = [
