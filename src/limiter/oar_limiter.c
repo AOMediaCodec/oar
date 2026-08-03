@@ -14,10 +14,11 @@
 #include "oar_limiter.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "definitions.h"
+#include "oar_base.h"
 
 oar_limiter_t* oar_limiter_create(int sampling_rate, double release_ms,
                                   double ceiling_db) {

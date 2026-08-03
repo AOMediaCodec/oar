@@ -13,8 +13,9 @@
 #ifndef __GAIN_CALCULATOR_H__
 #define __GAIN_CALCULATOR_H__
 
-#include "carray.h"
+#include "cvalue.h"
 #include "layout.h"
+#include "oar_config.h"
 #include "object_based_audio_renderer.h"
 
 #define def_none_degree 361.0f

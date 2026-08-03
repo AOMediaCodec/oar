@@ -14,6 +14,7 @@
 #define __CUSTOM_GAIN_CALCULATOR_H__
 
 #include "gain_calculator.h"
+#include "layout.h"
 
 typedef struct CustomGainCalculator custom_gain_calculator_t;
 

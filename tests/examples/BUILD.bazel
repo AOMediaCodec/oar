@@ -1,0 +1,33 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "test_audio_element_types",
+    srcs = ["test_audio_element_types.c"],
+    deps = [
+        "//:liboar",
+    ],
+)
+
+cc_binary(
+    name = "test_channel_based_rendering",
+    srcs = ["test_channel_based_rendering.c"],
+    deps = [
+        "//:liboar",
+    ],
+)
+
+cc_binary(
+    name = "test_object_based_rendering",
+    srcs = ["test_object_based_rendering.c"],
+    deps = [
+        "//:liboar",
+    ],
+)
+
+cc_binary(
+    name = "test_scene_based_rendering",
+    srcs = ["test_scene_based_rendering.c"],
+    deps = [
+        "//:liboar",
+    ],
+)

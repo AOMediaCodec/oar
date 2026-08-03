@@ -19,11 +19,13 @@
 
 #include "ear.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "ae_rdr.h"
 #include "definitions.h"
+#include "oar_base.h"
 #include "renderer_library_api.h"
 #include "renderer_library_utils.h"
 

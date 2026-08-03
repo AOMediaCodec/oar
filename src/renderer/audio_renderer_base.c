@@ -12,16 +12,22 @@
 
 #include "audio_renderer_base.h"
 
-#include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "animated.h"
+#include "animation.h"
 #include "clog.h"
+#include "cqueue.h"
+#include "cvalue.h"
 #include "cvector.h"
 #include "definitions.h"
+#include "oar.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 #include "oar_utils.h"
-#include "renderer_library_manager.h"
+#include "renderer_library_api.h"
 
 // Helper functions
 static int _find_metadata_item_id(value_wrap_t item, value_wrap_t key) {
@@ -383,6 +389,9 @@ oar_metadata_t *metadata_constant_polar_positions_create(
                   0, z_anim->control_relative_time * metadata->duration + 0.5f,
                   metadata->duration, relative_pos));
         } else {
+          cartesian_pos.x = 0.0f;
+          cartesian_pos.y = 0.0f;
+          cartesian_pos.z = 0.0f;
           warning(
               "Unsupported animation type (%u) for cartesian object positions.",
               metadata->object_positions.animated_cartesian_positions[obj_idx]

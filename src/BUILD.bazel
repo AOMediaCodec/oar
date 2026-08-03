@@ -1,0 +1,73 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = [
+        "//src:__subpackages__",
+    ]
+)
+
+# Build with the flag `--define OAR_ENABLE_BINAURALIZER=0` to disable
+# binaural rendering.
+config_setting(
+    name = "disable_binauralizer",
+    define_values = {
+        "OAR_ENABLE_BINAURALIZER": "0",
+    },
+)
+
+cc_library(
+    name = "oar_config",
+    hdrs = ["oar_config.h"],
+    strip_include_prefix = "//src",
+    deps = [
+        "//src/common",
+    ]
+)
+
+cc_library(
+    name = "oar",
+    srcs = [
+        "oar.c",
+    ],
+    strip_include_prefix = "//src",
+    # Defines `__binauralizer__` by default.
+    defines = select({
+        ":disable_binauralizer": [],
+        "//conditions:default": ["__binauralizer__"],
+    }),
+    # Depends on obr by default.
+    deps = [
+        ":oar_utils",
+        "//include",
+        "//src/common",
+        "//src/limiter:oar_limiter",
+        "//src/renderer:audio_element_renderer",
+        "//src/renderer:audio_elements_renderer",
+        "//src/renderer:audio_renderer_base",
+        "//src/renderer:renderer_library_api",
+        "//src/renderer:renderer_library_manager",
+        "//src/renderer/downmix",
+        "//src/renderer/ear",
+        "//src/renderer/olr",
+        "//src/utility",
+    ] + select({
+        ":disable_binauralizer": [],
+        "//conditions:default": ["//src/renderer/obr"],
+    }),
+    visibility = ["//:__pkg__"],
+    alwayslink = True,
+)
+
+cc_library(
+    name = "oar_utils",
+    srcs = [
+        "oar_utils.c",
+    ],
+    hdrs = ["oar_utils.h"],
+    strip_include_prefix = "//src",
+    deps = [
+        "//include",
+        "//src/common",
+        "//src/limiter:oar_limiter",
+        "//src/renderer:renderer_library_api",
+    ],
+)

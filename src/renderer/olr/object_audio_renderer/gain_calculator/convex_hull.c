@@ -9,7 +9,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+
+#include "oar_config.h"
 
 // Global point needed for sorting points with reference to the first point
 struct Point p0;

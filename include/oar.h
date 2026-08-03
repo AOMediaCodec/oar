@@ -13,6 +13,9 @@
 #ifndef __OAR_H__
 #define __OAR_H__
 
+#include <stdint.h>
+
+#include "oar_base.h"
 #include "oar_metadata.h"
 
 typedef struct Oar oar_t;

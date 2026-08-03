@@ -1,0 +1,19 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "olr",
+    srcs = ["olr.c"],
+    hdrs = ["olr.h"],
+    deps = [
+        "//include",
+        "//src/common",
+        "//src:oar_config",
+        "//src/renderer/olr/object_audio_renderer:layout",
+        "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer",
+        "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
+        "//src/renderer/olr/object_audio_renderer:utils",
+        "//src/renderer:renderer_library_api",
+    ],
+)

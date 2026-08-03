@@ -12,6 +12,9 @@
 
 #include "renderer_library_utils.h"
 
+#include "renderer_library_api.h"
+#include "oar_base.h"
+
 int rid_check(rid_t rid) {
   if (rid == ck_rid_none) {
     return ck_oar_error_inval;

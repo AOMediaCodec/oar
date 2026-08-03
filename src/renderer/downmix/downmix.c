@@ -19,12 +19,16 @@
 
 #include "downmix.h"
 
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "cqueue.h"
+#include "cvalue.h"
 #include "definitions.h"
 #include "downmix_renderer.h"
-#include "oar_utils.h"
+#include "oar_base.h"
+#include "oar_metadata.h"
 #include "renderer_library_api.h"
 
 #define def_dm_max_channel_number 12

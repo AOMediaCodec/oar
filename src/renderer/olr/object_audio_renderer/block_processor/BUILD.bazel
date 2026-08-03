@@ -1,0 +1,45 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+package(default_visibility = ["//src:__subpackages__"])
+
+cc_library(
+    name = "block_processing_channel",
+    srcs = ["block_processing_channel.c"],
+    hdrs = ["block_processing_channel.h"],
+    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    deps = [
+        ":interpret_object_metadata",
+        ":processing_block",
+        "//src:oar_config",
+        "//src/common",
+        "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
+        "//src/renderer/olr/object_audio_renderer:utils",
+        "//src/renderer/olr/object_audio_renderer/gain_calculator",
+    ],
+)
+
+cc_library(
+    name = "interpret_object_metadata",
+    srcs = ["interpret_object_metadata.c"],
+    hdrs = ["interpret_object_metadata.h"],
+    deps = [
+        ":processing_block",
+        "//src/common",
+        "//src:oar_config",
+        "//src/renderer/olr/object_audio_renderer/gain_calculator",
+        "//src/renderer/olr/object_audio_renderer:layout",
+        "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
+        "//src/renderer/olr/object_audio_renderer:utils",
+    ],
+)
+
+cc_library(
+    name = "processing_block",
+    srcs = ["processing_block.c"],
+    hdrs = ["processing_block.h"],
+    deps = [
+        "//src/common",
+        "//src:oar_config",
+        "//src/renderer/olr/object_audio_renderer:utils",
+    ],
+)
