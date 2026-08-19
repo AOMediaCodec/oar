@@ -1,5 +1,5 @@
 module(
-    name = "liboar",
+    name = "oar",
     version = "1.0.0",
 )
 
