@@ -1,4 +1,4 @@
-# Open Audio Renderer Library (liboar).
+# Open Audio Renderer Library (oar).
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
@@ -11,7 +11,7 @@ licenses(["notice"])
 exports_files(["LICENSE"])
 
 cc_library(
-    name = "liboar",
+    name = "oar",
     hdrs = [
         "//include:header_files",
     ],
