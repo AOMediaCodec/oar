@@ -23,6 +23,8 @@ This software module is out of scope and not part of the IAMF Final Deliverable.
  **/
 
 #define _USE_MATH_DEFINES
+#include <math.h>
+#include <string.h>
 
 #include "ae_rdr.h"
 #include "matrix_render.h"
