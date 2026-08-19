@@ -389,6 +389,9 @@ oar_metadata_t *metadata_constant_polar_positions_create(
                   0, z_anim->control_relative_time * metadata->duration + 0.5f,
                   metadata->duration, relative_pos));
         } else {
+          cartesian_pos.x = 0.0f;
+          cartesian_pos.y = 0.0f;
+          cartesian_pos.z = 0.0f;
           warning(
               "Unsupported animation type (%u) for cartesian object positions.",
               metadata->object_positions.animated_cartesian_positions[obj_idx]
