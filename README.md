@@ -29,14 +29,27 @@ The `oar` library provides a C API for rendering IAMF (Immersive Audio Model and
     $ bazel build <build_target>
 ~~~
 
-The `<build_target>` may be `src:oar` for building the `oar` library or `tests/examples/...` for building the example binaries, for example.
+The `<build_target>` may be `//:oar` for building the `oar` library, which is
+the target that carries the public headers, or `//tests/examples/...` for
+building the example binaries.
 
-Add `--config=arm64` at the end of the `bazel build` command when building for ARM CPUs.
+Add `--config=arm64` when cross-compiling for aarch64 Linux. Native builds,
+Apple Silicon included, need no extra flag.
+
+Add `--config=no_sframe` when building with GCC and linking with LLD, to stop
+the assembler emitting `.sframe` sections that LLD cannot consume.
 
 Note: the Open Binaural Renderer (`obr`) is enabled by default. To disable it,
-defines `OAR_ENABLE_BINAURALIZER` as `0`:
+define `OAR_ENABLE_BINAURALIZER` as `0`:
 ~~~
     $ bazel build <build_target> --define OAR_ENABLE_BINAURALIZER=0
+~~~
+
+The LFE channel is not generated when rendering HOA to loudspeakers unless
+`OAR_ENABLE_HOA_LFE` is defined as `1`, matching the CMake option of the same
+name:
+~~~
+    $ bazel build <build_target> --define OAR_ENABLE_HOA_LFE=1
 ~~~
 
 ### Basic Workflow
