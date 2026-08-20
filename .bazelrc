@@ -2,6 +2,11 @@
 # standalone; edit them there rather than duplicating them here.
 import %workspace%/src/renderer/obr/obr_capi/obr/toolchain.bazelrc
 
+# Optimized builds by default, matching the CMake build, which unconditionally
+# compiles with -O2. This is a real-time DSP library; pass `-c dbg` explicitly
+# for a debug build.
+build --compilation_mode=opt
+
 # Custom "arm64" build configuration
 build:arm64 --repo_env=CC=aarch64-linux-gnu-gcc
 build:arm64 --repo_env=CXX=aarch64-linux-gnu-g++
