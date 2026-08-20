@@ -52,6 +52,9 @@ name:
     $ bazel build <build_target> --define OAR_ENABLE_HOA_LFE=1
 ~~~
 
+Both options also accept the CMake boolean spellings (`ON`/`OFF`,
+`TRUE`/`FALSE`, `YES`/`NO`).
+
 ### Basic Workflow
 
 1.  **Initialization**: Create an `oar_t` instance by specifying the target output layout, samples per channel, and sampling rate.
