@@ -1,9 +1,6 @@
-build --enable_runfiles
-
-# Use the default C++ toolchain to build the tools used during the
-# build.
-build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
-build --enable_platform_specific_config
+# Toolchain flags are shared with the vendored obr tree, which also builds
+# standalone; edit them there rather than duplicating them here.
+import %workspace%/src/renderer/obr/obr_capi/obr/toolchain.bazelrc
 
 # Custom "arm64" build configuration
 build:arm64 --repo_env=CC=aarch64-linux-gnu-gcc
@@ -11,27 +8,3 @@ build:arm64 --repo_env=CXX=aarch64-linux-gnu-g++
 build:arm64 --action_env=CC=aarch64-linux-gnu-gcc
 build:arm64 --action_env=CXX=aarch64-linux-gnu-g++
 build:arm64 --cpu=aarch64
-
-# GCC's assembler emits .sframe sections that the LLVM linker (LLD) cannot
-# consume. Add `--config=no_sframe` when building with GCC and linking with
-# LLD. It is opt-in rather than always on: the `=no` form of the flag needs a
-# GNU assembler new enough to accept a value after `--gsframe`, and clang's
-# integrated assembler and MSVC reject `-Wa,--gsframe=no` outright.
-build:no_sframe --copt=-Wa,--gsframe=no
-build:no_sframe --cxxopt=-Wa,--gsframe=no
-
-# Platform specific configuration. The C++20 and -lm settings are required by
-# obr.
-build:linux --linkopt=-lm
-build:linux --cxxopt=-std=c++20
-build:linux --cxxopt=-Wno-sign-compare
-
-build:macos --macos_minimum_os=12.0
-build:macos --linkopt=-lm
-build:macos --cxxopt=-std=c++20
-build:macos --cxxopt=-Wno-sign-compare
-
-build:windows --cxxopt=/std:c++20
-build:windows --host_cxxopt=/std:c++20
-build:windows --linkopt=/STACK:8388608
-startup --windows_enable_symlinks
