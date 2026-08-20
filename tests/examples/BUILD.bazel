@@ -1,6 +1,6 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_test")
 
-cc_binary(
+cc_test(
     name = "test_audio_element_types",
     srcs = ["test_audio_element_types.c"],
     deps = [
@@ -8,7 +8,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_test(
     name = "test_channel_based_rendering",
     srcs = ["test_channel_based_rendering.c"],
     deps = [
@@ -18,9 +18,9 @@ cc_binary(
 
 # Exercises the 120 Hz LFE low-pass, which is only compiled into the library
 # when the LFE path is enabled. Build with `--define OAR_ENABLE_HOA_LFE=1`;
-# without it this target is skipped rather than built, so it does not break
-# `bazel build //...`.
-cc_binary(
+# without it this target is skipped rather than built or run, so it breaks
+# neither `bazel build //...` nor `bazel test //tests/examples/...`.
+cc_test(
     name = "test_hoa_lfe_rendering",
     srcs = ["test_hoa_lfe_rendering.c"],
     target_compatible_with = select({
@@ -32,7 +32,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_test(
     name = "test_object_based_rendering",
     srcs = ["test_object_based_rendering.c"],
     deps = [
@@ -40,7 +40,7 @@ cc_binary(
     ],
 )
 
-cc_binary(
+cc_test(
     name = "test_scene_based_rendering",
     srcs = ["test_scene_based_rendering.c"],
     deps = [
