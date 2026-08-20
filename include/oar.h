@@ -215,8 +215,12 @@ int oar_update_audio_element_data(oar_t *oar, uint32_t id,
  * @param     [in] samples : Number of samples to process as a unit
  * @return    0 on success, -1 for invalid parameters, -18 for unsupported
  *            metadata type
- * @note      Currently only ck_metadata_object_positions is supported for
- *            setting
+ * @note      Currently only ck_metadata_object_positions is supported.
+ *            samples must be in range (0, samples_per_channel].
+ *            For non-binaural rendering, this controls sub-frame position
+ *            update granularity. For binaural rendering, OBR always uses
+ *            config.samples_per_channel as buffer_size_per_channel; this
+ *            setting has no effect on binaural processing.
  */
 int oar_set_metadata_unit_to_process(oar_t *oar, oar_metadata_type_t type,
                                      uint32_t samples);

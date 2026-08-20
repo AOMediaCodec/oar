@@ -407,6 +407,13 @@ int oar_set_metadata_unit_to_process(oar_t *oar, oar_metadata_type_t type,
     return ck_oar_error_notsup;
   }
 
+  if (samples == 0 || oar->config.samples_per_channel < samples) {
+    warning(
+        "metadata unit samples (%u) is invalid for samples_per_channel (%u).",
+        samples, oar->config.samples_per_channel);
+    return ck_oar_error_inval;
+  }
+
   oar->metadata_samples[type] = samples;
 
   return ck_oar_ok;
