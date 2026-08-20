@@ -420,15 +420,10 @@ int audio_elements_renderer_render(audio_renderer_base_t *base,
   int ret = ck_oar_error_inval;
   if (!self || !output_block) return ck_oar_error_inval;
 
-  // if includes object-based renderers, use sub-frame rendering with position
-  // updates
-  if (audio_elements_renderer_private_object_based_elements_count(self)) {
-    ret = audio_elements_renderer_sub_frames_apply_positions(
-        self, output_block,
-        self->base.metadata_samples_ref[ck_metadata_object_positions]);
-  }
-  // Render the entire block at once using the underlying self library
-  else if (self->base.lib && self->base.lib->render) {
+  // Binaural (OBR) always renders the full frame using
+  // config.samples_per_channel. Sub-frame position updates are not applied
+  // for binaural because OBR fixes buffer_size_per_channel at creation time.
+  if (self->base.lib && self->base.lib->render) {
     ret = self->base.lib->render(&self->base.ctx, &self->base.block,
                                  output_block);
   }
