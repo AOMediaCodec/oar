@@ -9,6 +9,14 @@ cc_library(
         "h2m_rdr.c",
         "m2m_rdr.c",
     ],
+    # ae_rdr.h defaults DISABLE_LFE_HOA to 1. Defining it to 0 compiles in the
+    # HOA-to-loudspeakers LFE path, as CMake's OAR_ENABLE_HOA_LFE does.
+    # `defines` rather than `local_defines` so ear.c, which also tests the
+    # macro, sees the same value.
+    defines = select({
+        "//src:enable_hoa_lfe": ["DISABLE_LFE_HOA=0"],
+        "//conditions:default": [],
+    }),
     deps = [
         ":matrix_render",
     ],

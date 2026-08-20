@@ -14,6 +14,17 @@ config_setting(
     },
 )
 
+# Build with the flag `--define OAR_ENABLE_HOA_LFE=1` to generate the LFE
+# channel when rendering HOA to loudspeakers. Mirrors the CMake option of the
+# same name, which is likewise off by default.
+config_setting(
+    name = "enable_hoa_lfe",
+    define_values = {
+        "OAR_ENABLE_HOA_LFE": "1",
+    },
+    visibility = ["//visibility:public"],
+)
+
 cc_library(
     name = "oar_config",
     hdrs = ["oar_config.h"],

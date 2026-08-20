@@ -16,6 +16,22 @@ cc_binary(
     ],
 )
 
+# Exercises the 120 Hz LFE low-pass, which is only compiled into the library
+# when the LFE path is enabled. Build with `--define OAR_ENABLE_HOA_LFE=1`;
+# without it this target is skipped rather than built, so it does not break
+# `bazel build //...`.
+cc_binary(
+    name = "test_hoa_lfe_rendering",
+    srcs = ["test_hoa_lfe_rendering.c"],
+    target_compatible_with = select({
+        "//src:enable_hoa_lfe": [],
+        "//conditions:default": ["@platforms//:incompatible"],
+    }),
+    deps = [
+        "//:oar",
+    ],
+)
+
 cc_binary(
     name = "test_object_based_rendering",
     srcs = ["test_object_based_rendering.c"],
