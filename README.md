@@ -58,6 +58,35 @@ name:
 Both options also accept the CMake boolean spellings (`ON`/`OFF`,
 `TRUE`/`FALSE`, `YES`/`NO`).
 
+#### Using oar as a Bazel dependency
+
+Bazel applies module overrides only in the root module, so oar's own
+`local_path_override()` for the vendored `obr` module does not propagate to
+projects that depend on oar. A consuming project must repeat the override in
+its root `MODULE.bazel`, pointing at the tree vendored inside this repository:
+~~~
+    bazel_dep(name = "oar", version = "1.0.0")
+    git_override(
+        module_name = "oar",
+        remote = "<this repository>",
+        commit = "<oar commit>",
+    )
+
+    bazel_dep(name = "obr", version = "1.0.0")
+    git_override(
+        module_name = "obr",
+        remote = "<this repository>",
+        commit = "<the same oar commit>",
+        strip_prefix = "src/renderer/obr/obr_capi/obr",
+    )
+~~~
+
+`.bazelrc` files do not propagate across modules either, so the consuming
+project must also import (or copy) the toolchain flags obr needs — C++20,
+`-lm`, the Windows stack size — into its own `.bazelrc`; they are collected in
+`src/renderer/obr/obr_capi/obr/toolchain.bazelrc`. Alternatively, build with
+`--define OAR_ENABLE_BINAURALIZER=0` to drop the obr dependency entirely.
+
 ### Basic Workflow
 
 1.  **Initialization**: Create an `oar_t` instance by specifying the target output layout, samples per channel, and sampling rate.
