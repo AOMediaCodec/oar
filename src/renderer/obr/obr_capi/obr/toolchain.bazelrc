@@ -1,0 +1,34 @@
+# Toolchain flags shared between the standalone obr build and the parent oar
+# build. Both .bazelrc files (this directory's and the repository root's)
+# import this file; keep shared flags here so the two builds cannot drift.
+
+build --enable_runfiles
+
+# Use the default C++ toolchain to build the tools used during the
+# build.
+build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
+build --enable_platform_specific_config
+
+# GCC's assembler emits .sframe sections that the LLVM linker (LLD) cannot
+# consume. Add `--config=no_sframe` when building with GCC and linking with
+# LLD. It is opt-in rather than always on: the `=no` form of the flag needs a
+# GNU assembler new enough to accept a value after `--gsframe`, and clang's
+# integrated assembler and MSVC reject `-Wa,--gsframe=no` outright.
+# `--copt` reaches both C and C++ compile actions, so no `--cxxopt` is needed.
+build:no_sframe --copt=-Wa,--gsframe=no
+
+# Platform specific configuration. The C++20 and -lm settings are required by
+# obr.
+build:linux --linkopt=-lm
+build:linux --cxxopt=-std=c++20
+build:linux --cxxopt=-Wno-sign-compare
+
+build:macos --macos_minimum_os=12.0
+build:macos --linkopt=-lm
+build:macos --cxxopt=-std=c++20
+build:macos --cxxopt=-Wno-sign-compare
+
+build:windows --cxxopt=/std:c++20
+build:windows --host_cxxopt=/std:c++20
+build:windows --linkopt=/STACK:8388608
+startup --windows_enable_symlinks
