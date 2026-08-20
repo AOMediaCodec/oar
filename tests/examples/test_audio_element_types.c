@@ -29,14 +29,14 @@ oar_config_t create_default_oar_config() {
 }
 
 // Test case for ck_channel_based audio element type
-void test_channel_based_element() {
+int test_channel_based_element() {
   printf("Testing ck_channel_based audio element...\n");
 
   oar_config_t config = create_default_oar_config();
   oar_t *oar = oar_create(&config);
   if (oar == NULL) {
     fprintf(stderr, "Error: Failed to create OAR object\n");
-    return;
+    return -1;
   }
 
   // Add an audio group first
@@ -45,7 +45,7 @@ void test_channel_based_element() {
     fprintf(stderr, "Error: Failed to add audio group, error code: %d\n",
             group_id);
     oar_destroy(oar);
-    return;
+    return -1;
   }
   printf("Audio group (ID: %d) added successfully.\n", group_id);
 
@@ -60,29 +60,30 @@ void test_channel_based_element() {
     fprintf(stderr,
             "Error: Failed to add audio element, expected 0 but got %d\n", ret);
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   uint32_t num_channels = oar_get_number_of_audio_element_channels(oar, 1);
   if (num_channels != 2) {  // Stereo layout has 2 channels
     fprintf(stderr, "Error: Expected 2 channels but got %u\n", num_channels);
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   oar_destroy(oar);
   printf("ck_channel_based test passed.\n\n");
+  return 0;
 }
 
 // Test case for ck_scene_based audio element type
-void test_scene_based_element() {
+int test_scene_based_element() {
   printf("Testing ck_scene_based audio element...\n");
 
   oar_config_t config = create_default_oar_config();
   oar_t *oar = oar_create(&config);
   if (oar == NULL) {
     fprintf(stderr, "Error: Failed to create OAR object\n");
-    return;
+    return -1;
   }
 
   // Add an audio group first
@@ -91,7 +92,7 @@ void test_scene_based_element() {
     fprintf(stderr, "Error: Failed to add audio group, error code: %d\n",
             group_id);
     oar_destroy(oar);
-    return;
+    return -1;
   }
   printf("Audio group (ID: %d) added successfully.\n", group_id);
 
@@ -105,7 +106,7 @@ void test_scene_based_element() {
     fprintf(stderr,
             "Error: Failed to add audio element, expected 0 but got %d\n", ret);
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   // For 1st Order Ambisonics (1oa), we expect 4 channels (W, X, Y, Z)
@@ -113,22 +114,23 @@ void test_scene_based_element() {
   if (num_channels != 4) {
     fprintf(stderr, "Error: Expected 4 channels but got %u\n", num_channels);
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   oar_destroy(oar);
   printf("ck_scene_based test passed.\n\n");
+  return 0;
 }
 
 // Test case for ck_object_based audio element type
-void test_object_based_element() {
+int test_object_based_element() {
   printf("Testing ck_object_based audio element...\n");
 
   oar_config_t config = create_default_oar_config();
   oar_t *oar = oar_create(&config);
   if (oar == NULL) {
     fprintf(stderr, "Error: Failed to create OAR object\n");
-    return;
+    return -1;
   }
 
   // Add an audio group first
@@ -137,7 +139,7 @@ void test_object_based_element() {
     fprintf(stderr, "Error: Failed to add audio group, error code: %d\n",
             group_id);
     oar_destroy(oar);
-    return;
+    return -1;
   }
   printf("Audio group (ID: %d) added successfully.\n", group_id);
 
@@ -151,7 +153,7 @@ void test_object_based_element() {
     fprintf(stderr,
             "Error: Failed to add audio element, expected 0 but got %d\n", ret);
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   // Object based is currently mono
@@ -159,15 +161,16 @@ void test_object_based_element() {
   if (num_channels != 1) {
     fprintf(stderr, "Error: Expected 1 channel but got %u\n", num_channels);
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   oar_destroy(oar);
   printf("ck_object_based test passed.\n\n");
+  return 0;
 }
 
 // Test case for adding multiple elements of different types
-void test_multiple_element_types() {
+int test_multiple_element_types() {
   printf("Testing multiple audio element types...\n");
   // This test will focus on channel and scene based.
 
@@ -175,7 +178,7 @@ void test_multiple_element_types() {
   oar_t *oar = oar_create(&config);
   if (oar == NULL) {
     fprintf(stderr, "Error: Failed to create OAR object\n");
-    return;
+    return -1;
   }
 
   // Add channel-based element
@@ -189,7 +192,7 @@ void test_multiple_element_types() {
     fprintf(stderr, "Error: Failed to add audio group 1, error code: %d\n",
             group_id1);
     oar_destroy(oar);
-    return;
+    return -1;
   }
   printf("Audio group (ID: %d) added for channel-based element.\n", group_id1);
 
@@ -200,14 +203,14 @@ void test_multiple_element_types() {
         "Error: Failed to add channel audio element, expected 0 but got %d\n",
         ret);
     oar_destroy(oar);
-    return;
+    return -1;
   }
   if (oar_get_number_of_audio_element_channels(oar, 1) != 1) {
     fprintf(stderr,
             "Error: Expected 1 channel for channel-based element but got %u\n",
             oar_get_number_of_audio_element_channels(oar, 1));
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   // Add scene-based element
@@ -221,7 +224,7 @@ void test_multiple_element_types() {
     fprintf(stderr, "Error: Failed to add audio group 2, error code: %d\n",
             group_id2);
     oar_destroy(oar);
-    return;
+    return -1;
   }
   printf("Audio group (ID: %d) added for scene-based element.\n", group_id2);
 
@@ -231,7 +234,7 @@ void test_multiple_element_types() {
             "Error: Failed to add scene audio element, expected 0 but got %d\n",
             ret);
     oar_destroy(oar);
-    return;
+    return -1;
   }
   if (oar_get_number_of_audio_element_channels(oar, 2) !=
       1) {  // ZOA is 1 channel
@@ -239,27 +242,34 @@ void test_multiple_element_types() {
             "Error: Expected 1 channel for scene-based element but got %u\n",
             oar_get_number_of_audio_element_channels(oar, 2));
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   uint32_t num_elements = oar_get_number_of_audio_elements(oar);
   if (num_elements != 2) {
     fprintf(stderr, "Error: Expected 2 elements but got %u\n", num_elements);
     oar_destroy(oar);
-    return;
+    return -1;
   }
 
   oar_destroy(oar);
   printf("Multiple element types test passed.\n\n");
+  return 0;
 }
 
 int main() {
   printf("Running audio_element_type_t tests...\n\n");
 
-  test_channel_based_element();
-  test_scene_based_element();
-  test_object_based_element();
-  test_multiple_element_types();
+  int failed = 0;
+  failed |= test_channel_based_element() != 0;
+  failed |= test_scene_based_element() != 0;
+  failed |= test_object_based_element() != 0;
+  failed |= test_multiple_element_types() != 0;
+
+  if (failed) {
+    fprintf(stderr, "audio_element_type_t tests FAILED.\n");
+    return -1;
+  }
 
   printf("All audio_element_type_t tests completed successfully.\n");
   return 0;
