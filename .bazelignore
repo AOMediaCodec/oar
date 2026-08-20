@@ -1,5 +1,12 @@
-# The nested obr package is treated as an external respository, referenced
+# The nested obr package is treated as an external repository, referenced
 # in the MODULE.bazel file using `local_path_override()`.
 # To build targets in the nested obr package, use `bazel build @obr//...`
 # instead of `bazel build //src/renderer/obr/obr_capi/obr/...`.
 src/renderer/obr/obr_capi/obr
+
+# CMake output directories. The README's first build instruction is
+# `cmake -B build`, which fetches abseil's sources into build/_deps; Bazel
+# cannot load those, so `bazel build //...` fails whenever a CMake tree is
+# present alongside the Bazel one.
+build
+out
