@@ -1,0 +1,34 @@
+name: Bazel
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Bazelisk ships on the GitHub-hosted runner images and honours the
+      # version pinned in .bazelversion, so no toolchain setup step is needed.
+      - name: Build
+        run: bazelisk build //...
+
+      # The wildcard picks up every test target in the package, so a newly
+      # added example is run without this workflow needing an edit. The
+      # LFE test is incompatible without its flag and is skipped here.
+      - name: Run smoke tests
+        run: bazelisk test --test_output=errors //tests/examples/...
+
+      # The HOA-to-loudspeakers LFE path is compiled out by default, and its
+      # test target is skipped without the flag, so it needs its own pass.
+      # Only the test's dependency cone is rebuilt with the define.
+      - name: Test with the HOA LFE path enabled
+        run: bazelisk test --test_output=errors --define OAR_ENABLE_HOA_LFE=1 //tests/examples:test_hoa_lfe_rendering
