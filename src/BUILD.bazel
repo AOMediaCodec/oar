@@ -1,3 +1,4 @@
+load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
 package(default_visibility = [
@@ -5,23 +6,69 @@ package(default_visibility = [
     ]
 )
 
+# The CMake options mirrored below accept boolean constants in several
+# spellings (ON/OFF, TRUE/FALSE, YES/NO), and `--define` silently ignores
+# values with no matching config_setting, so recognize the common spellings
+# rather than just "1"/"0".
+ENABLED_SPELLINGS = [
+    "1",
+    "ON",
+    "On",
+    "on",
+    "TRUE",
+    "True",
+    "true",
+    "YES",
+    "Yes",
+    "yes",
+]
+
+DISABLED_SPELLINGS = [
+    "0",
+    "OFF",
+    "Off",
+    "off",
+    "FALSE",
+    "False",
+    "false",
+    "NO",
+    "No",
+    "no",
+]
+
 # Build with the flag `--define OAR_ENABLE_BINAURALIZER=0` to disable
 # binaural rendering.
-config_setting(
+[
+    config_setting(
+        name = "_binauralizer_" + value,
+        define_values = {
+            "OAR_ENABLE_BINAURALIZER": value,
+        },
+    )
+    for value in DISABLED_SPELLINGS
+]
+
+selects.config_setting_group(
     name = "disable_binauralizer",
-    define_values = {
-        "OAR_ENABLE_BINAURALIZER": "0",
-    },
+    match_any = [":_binauralizer_" + value for value in DISABLED_SPELLINGS],
 )
 
 # Build with the flag `--define OAR_ENABLE_HOA_LFE=1` to generate the LFE
 # channel when rendering HOA to loudspeakers. Mirrors the CMake option of the
 # same name, which is likewise off by default.
-config_setting(
+[
+    config_setting(
+        name = "_hoa_lfe_" + value,
+        define_values = {
+            "OAR_ENABLE_HOA_LFE": value,
+        },
+    )
+    for value in ENABLED_SPELLINGS
+]
+
+selects.config_setting_group(
     name = "enable_hoa_lfe",
-    define_values = {
-        "OAR_ENABLE_HOA_LFE": "1",
-    },
+    match_any = [":_hoa_lfe_" + value for value in ENABLED_SPELLINGS],
     visibility = ["//visibility:public"],
 )
 
