@@ -31,7 +31,10 @@ The `oar` library provides a C API for rendering IAMF (Immersive Audio Model and
 
 The `<build_target>` may be `//:oar` for building the `oar` library, which is
 the target that carries the public headers, or `//tests/examples/...` for
-building the example binaries.
+building the example binaries (which also run under `bazel test`).
+
+Bazel builds are optimized (`-c opt`) by default, matching the CMake build's
+unconditional `-O2`; pass `-c dbg` for a debug build.
 
 Add `--config=arm64` when cross-compiling for aarch64 Linux. Native builds,
 Apple Silicon included, need no extra flag.
