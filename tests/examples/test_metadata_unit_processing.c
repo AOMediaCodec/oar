@@ -1614,11 +1614,10 @@ static int run_test_in_child(int test_index) {
   int exit_code =
       _spawnl(_P_WAIT, exe_path, quoted_path, "--child", index_str, NULL);
 
-  if (exit_code == -1 && errno != 0) {
-    /* _spawnl failed to launch the child process (not a child exit code).
-     * Process exit codes are 8-bit unsigned (0-255), so -1 uniquely
-     * identifies spawn failure, but checking errno makes this explicit
-     * and portable across CRT implementations. */
+  if (exit_code == -1) {
+    /* The child process never exits with -1 (see main(): failures are mapped
+     * to exit code 1), so -1 unambiguously means _spawnl itself failed to
+     * launch the child.  errno provides additional diagnostic detail. */
     fprintf(stderr, "[%s] FAILED: spawn error (errno %d: %s)\n", name, errno,
             strerror(errno));
     return -1;
@@ -1642,13 +1641,16 @@ int main(int argc, char *argv[]) {
   if (argc >= 3 && strcmp(argv[1], "--child") == 0) {
     int index = atoi(argv[2]);
     if (index < 0 || index >= NUM_TESTS) {
-      return -1;
+      return 2; /* sentinel: invalid index (distinct from test failure) */
     }
     int ret = g_tests[index].fn();
 
     fflush(stdout);
     fflush(stderr);
-    return ret;
+    /* Map -1 (test failure) to exit code 1 so that -1 from _spawnl uniquely
+     * identifies a spawn failure rather than colliding with the child's own
+     * failure return. */
+    return (ret != 0) ? 1 : 0;
   }
 
   printf("========================================\n");
