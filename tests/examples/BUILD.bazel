@@ -47,3 +47,12 @@ cc_test(
         "//:oar",
     ],
 )
+
+cc_test(
+    name = "test_metadata_unit_processing",
+    srcs = ["test_metadata_unit_processing.c"],
+    deps = [
+        "//:oar",
+    ],
+)
+

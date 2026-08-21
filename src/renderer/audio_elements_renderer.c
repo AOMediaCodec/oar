@@ -27,8 +27,8 @@
 #include "oar_base.h"
 #include "oar_metadata.h"
 #include "oar_utils.h"
-#include "renderer_library_manager.h"
 #include "renderer_library_api.h"
+#include "renderer_library_manager.h"
 
 typedef struct AudioElementsRenderer {
   audio_renderer_base_t base;
@@ -61,103 +61,42 @@ static int audio_elements_renderer_private_object_based_elements_count(
   return count;
 }
 
-static int audio_elements_renderer_sub_frames_apply_positions(
-    audio_elements_renderer_t *self, oar_audio_block_t *block,
-    uint32_t sub_frame_samples) {
-  uint32_t total_samples = block->samples_per_channel;
-  uint32_t processed_samples = 0;
+static int audio_elements_renderer_apply_frame_positions(
+    audio_elements_renderer_t *self) {
+  int n = vector_size(self->elements);
 
-  while (processed_samples < total_samples) {
-    uint32_t current_unit_samples = sub_frame_samples;
-    uint32_t remaining_samples = total_samples - processed_samples;
+  for (int i = 0; i < n; i++) {
+    audio_element_context_t *ctx = def_value_wrap_type_ptr(
+        audio_element_context_t, vector_at(self->elements, i));
+    if (!ctx->rendering_metadata.positions) continue;
+
+    uint32_t sample_position = ctx->rendering_metadata.positions->start;
     uint32_t accumulated_duration = 0;
+    oar_metadata_t *current_metadata = 0;
 
-    int n = vector_size(self->elements);
+    int m = queue_length(ctx->rendering_metadata.positions->metadatas);
+    for (int j = 0; j < m; j++) {
+      oar_metadata_t *metadata = def_value_wrap_optional_type_ptr(
+          oar_metadata_t,
+          queue_at(ctx->rendering_metadata.positions->metadatas, j));
+      if (!metadata || metadata->type != ck_metadata_object_positions) continue;
 
-    if (remaining_samples < sub_frame_samples)
-      current_unit_samples = remaining_samples;
-
-    for (int i = 0; i < n; i++) {
-      audio_element_context_t *ctx = def_value_wrap_type_ptr(
-          audio_element_context_t, vector_at(self->elements, i));
-      if (!ctx->rendering_metadata.positions) continue;
-
-      uint32_t sample_position =
-          processed_samples + ctx->rendering_metadata.positions->start;
-      // Find the current position metadata for this sample position
-      oar_metadata_t *current_metadata = 0;
-      int m = queue_length(ctx->rendering_metadata.positions->metadatas);
-      for (int j = 0; j < m; j++) {
-        oar_metadata_t *metadata = def_value_wrap_optional_type_ptr(
-            oar_metadata_t,
-            queue_at(ctx->rendering_metadata.positions->metadatas, j));
-        if (!metadata || metadata->type != ck_metadata_object_positions)
-          continue;
-
-        if (sample_position >= accumulated_duration &&
-            sample_position < accumulated_duration + metadata->duration) {
-          // Create a constant position metadata for this specific sample
-          // position
-          uint32_t relative_pos = sample_position - accumulated_duration;
-          current_metadata = metadata_constant_polar_positions_create(
-              metadata, relative_pos, current_unit_samples);
-          break;
-        }
-
-        accumulated_duration += metadata->duration;
+      if (sample_position >= accumulated_duration &&
+          sample_position < accumulated_duration + metadata->duration) {
+        uint32_t relative_pos = sample_position - accumulated_duration;
+        current_metadata = metadata_constant_polar_positions_create(
+            metadata, relative_pos, self->base.block.samples_per_channel);
+        break;
       }
-
-      if (current_metadata) {
-        // Apply position metadata if found
-        if (self->base.lib && self->base.lib->metadata_update)
-          self->base.lib->metadata_update(&self->base.ctx, i, current_metadata);
-        metadata_delete(current_metadata);
-      }
+      accumulated_duration += metadata->duration;
     }
 
-    oar_audio_block_t sub_block;
-    sub_block.channels = self->channels_count;
-    sub_block.samples_per_channel = current_unit_samples;
-
-    sub_block.data =
-        def_malloc(float, (sub_block.channels * sub_block.samples_per_channel));
-    if (!sub_block.data) return ck_oar_error_nomem;
-
-    oar_audio_block_t sub_out_block;
-    sub_out_block.channels = block->channels;
-    sub_out_block.samples_per_channel = current_unit_samples;
-
-    sub_out_block.data = def_malloc(
-        float, (sub_out_block.channels * sub_out_block.samples_per_channel));
-    if (!sub_out_block.data) {
-      def_free(sub_block.data);
-      return ck_oar_error_nomem;
+    if (current_metadata) {
+      if (self->base.lib && self->base.lib->metadata_update)
+        self->base.lib->metadata_update(&self->base.ctx, i, current_metadata);
+      metadata_delete(current_metadata);
     }
-
-    for (uint32_t ch = 0; ch < sub_block.channels; ch++)
-      memcpy(sub_block.data + ch * sub_block.samples_per_channel,
-             self->base.block.data + ch * self->base.block.samples_per_channel +
-                 processed_samples,
-             (current_unit_samples * sizeof(float)));
-
-    // Render this sub-frame
-    if (self->base.lib && self->base.lib->render) {
-      self->base.lib->render(&self->base.ctx, &sub_block, &sub_out_block);
-
-      for (uint32_t ch = 0; ch < sub_out_block.channels; ch++)
-        memcpy(
-            block->data + ch * block->samples_per_channel + processed_samples,
-            sub_out_block.data + ch * sub_out_block.samples_per_channel,
-            (current_unit_samples * sizeof(float)));
-    }
-
-    // Clean up allocated memory
-    def_free(sub_block.data);
-    def_free(sub_out_block.data);
-
-    processed_samples += current_unit_samples;
   }
-
   return ck_oar_ok;
 }
 
@@ -347,6 +286,20 @@ int audio_elements_renderer_add_data(audio_renderer_base_t *base,
     return ck_oar_error_inval;
   }
 
+  // Validate block dimensions match config to prevent OBR buffer size mismatch
+  // crash and heap overflow from inconsistent stride/length in memcpy.
+  if (block->samples_per_channel != self->base.ctx.samples_per_frame) {
+    warning("Input block samples per channel (%u) don't match config (%u)",
+            block->samples_per_channel, self->base.ctx.samples_per_frame);
+    return ck_oar_error_inval;
+  }
+
+  if (block->channels != (uint32_t)rid_channels_count(ctx->rid)) {
+    warning("Input block channels (%u) don't match element channels (%u)",
+            block->channels, rid_channels_count(ctx->rid));
+    return ck_oar_error_inval;
+  }
+
   if (self->elements_updated) {
     if (!self->base.block.data) {
       debug("channels %d, samples %d", self->channels_count,
@@ -358,9 +311,12 @@ int audio_elements_renderer_add_data(audio_renderer_base_t *base,
       }
       self->base.block.samples_per_channel = block->samples_per_channel;
     } else if (block->channels < self->channels_count) {
+      /* A new element was added after the initial allocation, increasing
+       * channels_count. Realloc to fit all elements' channels. */
       float *data =
           def_realloc(self->base.block.data, float,
                       (self->channels_count * block->samples_per_channel));
+
       if (!data) return ck_oar_error_nomem;
       self->base.block.data = data;
     }
@@ -420,9 +376,14 @@ int audio_elements_renderer_render(audio_renderer_base_t *base,
   int ret = ck_oar_error_inval;
   if (!self || !output_block) return ck_oar_error_inval;
 
-  // Binaural (OBR) always renders the full frame using
-  // config.samples_per_channel. Sub-frame position updates are not applied
-  // for binaural because OBR fixes buffer_size_per_channel at creation time.
+  // Frame-granularity position update: forward object-based element positions
+  // to OBR before rendering. OBR fixes buffer_size_per_channel at creation
+  // time, so sub-frame rendering is not supported, but position metadata still
+  // needs to be applied at frame granularity.
+  if (audio_elements_renderer_private_object_based_elements_count(self))
+    audio_elements_renderer_apply_frame_positions(self);
+
+  // Full-frame rendering (OBR buffer_size_per_channel == samples_per_channel)
   if (self->base.lib && self->base.lib->render) {
     ret = self->base.lib->render(&self->base.ctx, &self->base.block,
                                  output_block);
