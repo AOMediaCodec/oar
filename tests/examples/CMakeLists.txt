@@ -24,6 +24,14 @@ target_link_libraries(test_scene_based_rendering PRIVATE oar)
 target_link_libraries(test_object_based_rendering PRIVATE oar)
 target_link_libraries(test_metadata_unit_processing PRIVATE oar)
 
+# Register tests with CTest so they run automatically in CI.
+add_test(NAME test_audio_element_types COMMAND test_audio_element_types)
+add_test(NAME test_channel_based_rendering COMMAND test_channel_based_rendering)
+add_test(NAME test_scene_based_rendering COMMAND test_scene_based_rendering)
+add_test(NAME test_object_based_rendering COMMAND test_object_based_rendering)
+add_test(NAME test_metadata_unit_processing COMMAND test_metadata_unit_processing)
+
+
 # Include directories are inherited from the parent project,
 # so oar.h and other headers should be found automatically.
 
