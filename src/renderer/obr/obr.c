@@ -164,6 +164,21 @@ static int _set_attribute(renderer_library_context_t *ctx,
       }
 
     } break;
+    case ck_attribute_remove_element: {
+      /* Only the last-added element can be removed (LIFO). OBR does not
+       * support removing an arbitrary element by index. If the requested
+       * index is not the last, return notsup; per-element DSP state is
+       * cleaned up when the renderer is closed. */
+
+      uint32_t index = *(const uint32_t *)value;
+      int num_elements = obr_get_number_of_audio_elements(obr->api);
+      if (num_elements == 0) return ck_oar_error_inval;
+      if (index != (uint32_t)(num_elements - 1)) return ck_oar_error_notsup;
+      if (obr_remove_last_audio_element(obr->api) < 0) {
+        warning("Failed to remove audio element at index %u", index);
+        return ck_oar_error_inval;
+      }
+    } break;
     case ck_attribute_element_head_locked: {
       element_head_locked_t *params = (element_head_locked_t *)value;
       int num_elements = obr_get_number_of_audio_elements(obr->api);

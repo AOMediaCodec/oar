@@ -15,6 +15,10 @@ add_executable(test_object_based_rendering test_object_based_rendering.c)
 # Add the test for metadata unit processing (binaural OBR sub-frame)
 add_executable(test_metadata_unit_processing test_metadata_unit_processing.c)
 
+# Add the test for audio element removal
+add_executable(test_remove_audio_element test_remove_audio_element.c
+                                               test_framework.c)
+
 # Link the tests against the main oar library.
 # The 'oar' target is defined in the parent CMakeLists.txt,
 # so it's accessible here.
@@ -23,6 +27,7 @@ target_link_libraries(test_channel_based_rendering PRIVATE oar)
 target_link_libraries(test_scene_based_rendering PRIVATE oar)
 target_link_libraries(test_object_based_rendering PRIVATE oar)
 target_link_libraries(test_metadata_unit_processing PRIVATE oar)
+target_link_libraries(test_remove_audio_element PRIVATE oar)
 
 # Register tests with CTest so they run automatically in CI.
 add_test(NAME test_audio_element_types COMMAND test_audio_element_types)
@@ -30,7 +35,7 @@ add_test(NAME test_channel_based_rendering COMMAND test_channel_based_rendering)
 add_test(NAME test_scene_based_rendering COMMAND test_scene_based_rendering)
 add_test(NAME test_object_based_rendering COMMAND test_object_based_rendering)
 add_test(NAME test_metadata_unit_processing COMMAND test_metadata_unit_processing)
-
+add_test(NAME test_remove_audio_element COMMAND test_remove_audio_element)
 
 # Include directories are inherited from the parent project,
 # so oar.h and other headers should be found automatically.
@@ -41,12 +46,14 @@ set_property(TARGET test_channel_based_rendering PROPERTY C_STANDARD 99)
 set_property(TARGET test_scene_based_rendering PROPERTY C_STANDARD 99)
 set_property(TARGET test_object_based_rendering PROPERTY C_STANDARD 99)
 set_property(TARGET test_metadata_unit_processing PROPERTY C_STANDARD 99)
+set_property(TARGET test_remove_audio_element PROPERTY C_STANDARD 99)
 
 if(NOT MSVC)
   target_link_libraries(test_channel_based_rendering PRIVATE m)
   target_link_libraries(test_scene_based_rendering PRIVATE m)
   target_link_libraries(test_object_based_rendering PRIVATE m)
   target_link_libraries(test_metadata_unit_processing PRIVATE m)
+  target_link_libraries(test_remove_audio_element PRIVATE m)
 endif()
 
 # The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
