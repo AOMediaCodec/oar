@@ -56,3 +56,14 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_remove_audio_element",
+    srcs = [
+        "test_remove_audio_element.c",
+        "test_framework.c",
+    ],
+    deps = [
+        "//:oar",
+    ],
+)
+

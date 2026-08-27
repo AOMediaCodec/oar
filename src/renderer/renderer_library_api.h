@@ -129,6 +129,8 @@ typedef enum ERenderingAttribute {
   ck_attribute_head_tracking,
   /** Add or modify rendering elements */
   ck_attribute_add_element,
+  /** Remove an audio element by index (value: uint32_t*) */
+  ck_attribute_remove_element,
   /** Set head-locked rendering mode for a specific audio element */
   ck_attribute_element_head_locked,
 } rendering_attribute_t;

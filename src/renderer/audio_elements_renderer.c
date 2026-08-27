@@ -234,6 +234,61 @@ int audio_elements_renderer_add_element(
   return ret;
 }
 
+int audio_elements_renderer_remove_element(audio_renderer_base_t *base,
+                                           uint32_t element_id) {
+  audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
+  if (!self) return ck_oar_error_inval;
+
+  audio_element_context_t *ctx = def_value_wrap_optional_type_ptr(
+      audio_element_context_t, hash_map_get(self->element_map, element_id));
+  if (!ctx) {
+    warning("Element %u not found for removal", element_id);
+    return ck_oar_error_inval;
+  }
+
+  /* Notify the underlying renderer library to release per-element DSP
+   * resources.  If the library does not support removal (e.g., OBR only
+   * supports LIFO), abort the removal so that OAR and library state stay
+   * consistent.  The element remains functional and rendering is unaffected. */
+  if (self->base.lib && self->base.lib->set_attribute) {
+    uint32_t lib_index = ctx->index;
+    int ret = self->base.lib->set_attribute(
+        &self->base.ctx, ck_attribute_remove_element, &lib_index);
+    if (ret != ck_oar_ok) {
+      warning(
+          "Cannot remove element %u from renderer library (error %d). "
+          "Removal aborted; element remains active.",
+          element_id, ret);
+      return ret;
+    }
+  }
+
+  uint32_t removed_channels = rid_channels_count(ctx->rid);
+  uint32_t removed_index = ctx->index;
+
+  hash_map_remove(self->element_map, element_id);
+  vector_remove(self->elements, removed_index,
+                def_default_free_ptr(audio_element_context_delete));
+
+  /* Update indices and channel offsets for remaining elements */
+  for (int i = removed_index; i < vector_size(self->elements); i++) {
+    audio_element_context_t *remaining_ctx = def_value_wrap_type_ptr(
+        audio_element_context_t, vector_at(self->elements, i));
+    if (remaining_ctx) {
+      remaining_ctx->index = i;
+      remaining_ctx->channel_start_index -= removed_channels;
+    }
+  }
+
+  self->channels_count -= removed_channels;
+  self->elements_updated = 1;
+
+  info("Removed element %u from binaural renderer, remaining elements: %d",
+       element_id, vector_size(self->elements));
+
+  return ck_oar_ok;
+}
+
 int audio_elements_renderer_get_element_index(audio_renderer_base_t *base,
                                               uint32_t element_id) {
   audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
@@ -493,6 +548,7 @@ audio_renderer_base_t *audio_elements_renderer_create_wrapper(
         .destroy = audio_elements_renderer_delete,
         .get_element_index = audio_elements_renderer_get_element_index,
         .add_element = audio_elements_renderer_add_element,
+        .remove_element = audio_elements_renderer_remove_element,
         .update_element_metadata =
             audio_elements_renderer_update_element_metadata,
         .add_data = audio_elements_renderer_add_data,

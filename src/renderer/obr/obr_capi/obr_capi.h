@@ -158,6 +158,15 @@ int obr_get_number_of_output_channels(obr_handle handle);
 int obr_get_number_of_audio_elements(obr_handle handle);
 
 /**
+ * @brief     Removes the last added audio element.
+ * @param     [in] handle : obr handle.
+ * @return    @0: success, @others: fail
+ * @note      Only the last-added element can be removed (LIFO).
+ *            Per-element DSP resources are released immediately.
+ */
+int obr_remove_last_audio_element(obr_handle handle);
+
+/**
  * @brief     Sets the position of an audio object.
  * @param     [in] handle : obr handle.
  * @param     [in] index : Index of the audio object.

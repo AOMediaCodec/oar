@@ -89,8 +89,6 @@ static int _find_group_id(value_wrap_t item, value_wrap_t key) {
   return group->id == key.u32 ? 1 : 0;
 }
 
-static void _audio_element_delete(audio_renderer_base_t *renderer) {}
-
 static int _find_element_id(value_wrap_t item, value_wrap_t key) {
   audio_renderer_base_t *renderer = def_value_wrap_ptr(&item);
 
@@ -344,8 +342,25 @@ int oar_remove_audio_element(oar_t *oar, uint32_t id) {
     index = vector_find(group->renderers, def_value_wrap_instance_u32(id),
                         _find_element_id, &v);
     if (index >= 0) {
-      vector_remove(group->renderers, index,
-                    def_default_free_ptr(_audio_element_delete));
+      audio_renderer_base_t *renderer =
+          def_value_wrap_type_ptr(audio_renderer_base_t, &v);
+
+      if (renderer->ctx.in == ck_ri_multi_ids) {
+        /* Binaural (multi-element) renderer: remove only the single element.
+         * The renderer itself is not destroyed here — its lifecycle is tied
+         * to the audio group (created in oar_add_audio_group, destroyed in
+         * _audio_group_delete). Keeping the empty renderer allows subsequent
+         * oar_add_audio_element calls to reuse it. */
+        if (renderer->impl && renderer->impl->remove_element) {
+          int ret = renderer->impl->remove_element(renderer, id);
+          if (ret != ck_oar_ok) return ret;
+        }
+      } else {
+        /* Single-element renderer: remove and destroy entirely */
+        vector_remove(group->renderers, index,
+                      def_default_free_ptr(audio_renderer_delete));
+      }
+
       return ck_oar_ok;
     }
   }

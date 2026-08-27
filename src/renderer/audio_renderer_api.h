@@ -33,6 +33,9 @@ typedef int (*func_add_element_t)(audio_renderer_base_t *base,
                                   uint32_t element_id,
                                   const oar_audio_element_config_t *config);
 
+typedef int (*func_remove_element_t)(audio_renderer_base_t *base,
+                                     uint32_t element_id);
+
 typedef int (*func_get_element_index_t)(audio_renderer_base_t *base,
                                         uint32_t element_id);
 
@@ -70,6 +73,7 @@ typedef int (*func_get_element_channels_t)(audio_renderer_base_t *base,
 struct AudioRendererAPI {
   func_destroy_t destroy;
   func_add_element_t add_element;
+  func_remove_element_t remove_element;
   func_get_element_index_t get_element_index;
   func_update_element_metadata_t update_element_metadata;
   func_set_element_head_locked_t set_element_head_locked;

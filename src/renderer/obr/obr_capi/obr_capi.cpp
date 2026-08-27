@@ -135,6 +135,12 @@ int obr_get_number_of_audio_elements(obr_handle handle) {
   return (int)cast_(handle)->GetNumberOfAudioElements();
 }
 
+int obr_remove_last_audio_element(obr_handle handle) {
+  if (!handle) return -1;
+  auto status = cast_(handle)->RemoveLastAudioElement();
+  return status.ok() ? 0 : -1;
+}
+
 int obr_update_object_position(obr_handle handle, uint32_t index, float azimuth,
                                float elevation, float distance) {
   if (!handle) return -1;
