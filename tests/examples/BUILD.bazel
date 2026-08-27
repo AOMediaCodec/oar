@@ -61,6 +61,7 @@ cc_test(
     srcs = [
         "test_remove_audio_element.c",
         "test_framework.c",
+        "test_framework.h",
     ],
     deps = [
         "//:oar",
