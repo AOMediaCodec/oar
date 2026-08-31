@@ -163,7 +163,7 @@ static int _sub_frames_apply_positions(audio_element_renderer_t *renderer,
 
 // Public API functions
 static void audio_element_renderer_delete(audio_renderer_base_t *base);
-static uint32_t audio_element_renderer_get_channels(
+static uint32_t audio_element_renderer_get_channel_count(
     audio_renderer_base_t *base);
 
 audio_element_renderer_t *audio_element_renderer_new(
@@ -208,7 +208,8 @@ audio_element_renderer_t *audio_element_renderer_new(
   self->base.metadata_samples_ref = metadata_samples_ref;
 
   info("Using self library %s for stream %u", self->base.lib->id, id);
-  self->base.block.channels = audio_element_renderer_get_channels(&self->base);
+  self->base.block.channels =
+      audio_element_renderer_get_channel_count(&self->base);
   self->base.block.samples_per_channel = oar_config->samples_per_channel;
   self->base.block.data = def_mallocz(
       float, self->base.block.channels * self->base.block.samples_per_channel);
@@ -395,7 +396,7 @@ int audio_element_renderer_apply_gains(audio_renderer_base_t *base,
   return ck_oar_ok;
 }
 
-uint32_t audio_element_renderer_get_channels(audio_renderer_base_t *base) {
+uint32_t audio_element_renderer_get_channel_count(audio_renderer_base_t *base) {
   audio_element_renderer_t *self = def_audio_element_renderer_ptr(base);
   switch (self->config.type) {
     case ck_channel_based:
@@ -457,6 +458,11 @@ void audio_element_renderer_metadatas_elapse(audio_renderer_base_t *base,
   }
 }
 
+static uint32_t audio_element_renderer_get_element_count(
+    audio_renderer_base_t *base) {
+  return 1;
+}
+
 // Wrapper function implementations
 audio_renderer_base_t *audio_element_renderer_create_wrapper(
     const oar_config_t *oar_config, uint32_t id,
@@ -477,7 +483,8 @@ audio_renderer_base_t *audio_element_renderer_create_wrapper(
         .set_element_head_locked =
             audio_element_renderer_set_element_head_locked,
         .set_head_rotation = audio_renderer_set_head_rotation,
-        .get_channels = audio_element_renderer_get_channels,
+        .get_channel_count = audio_element_renderer_get_channel_count,
+        .get_element_count = audio_element_renderer_get_element_count,
         .metadatas_elapse = audio_element_renderer_metadatas_elapse,
     };
 
