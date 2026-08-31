@@ -354,6 +354,8 @@ int oar_remove_audio_element(oar_t *oar, uint32_t id) {
         if (renderer->impl && renderer->impl->remove_element) {
           int ret = renderer->impl->remove_element(renderer, id);
           if (ret != ck_oar_ok) return ret;
+        } else {
+          return ck_oar_error_notsup;
         }
       } else {
         /* Single-element renderer: remove and destroy entirely */
@@ -666,10 +668,10 @@ uint32_t oar_get_number_of_audio_element_channels(oar_t *oar, uint32_t id) {
                     _find_element_id, &v) >= 0) {
       audio_renderer_base_t *renderer = def_value_wrap_ptr(&v);
       // Call function through impl pointer
-      if (renderer->impl && renderer->impl->get_element_channels)
-        return renderer->impl->get_element_channels(renderer, id);
-      else if (renderer->impl && renderer->impl->get_channels)
-        return renderer->impl->get_channels(renderer);
+      if (renderer->impl && renderer->impl->get_element_channel_count)
+        return renderer->impl->get_element_channel_count(renderer, id);
+      else if (renderer->impl && renderer->impl->get_channel_count)
+        return renderer->impl->get_channel_count(renderer);
     }
   }
 
@@ -689,7 +691,13 @@ uint32_t oar_get_number_of_audio_elements(oar_t *oar) {
 
   for (i = 0; i < vector_size(oar->groups); i++) {
     audio_group_t *group = def_value_wrap_ptr(vector_at(oar->groups, i));
-    total_count += vector_size(group->renderers);
+
+    for (int j = 0; j < vector_size(group->renderers); j++) {
+      audio_renderer_base_t *renderer =
+          def_value_wrap_ptr(vector_at(group->renderers, j));
+      if (renderer && renderer->impl && renderer->impl->get_element_count)
+        total_count += renderer->impl->get_element_count(renderer);
+    }
   }
 
   return total_count;

@@ -61,13 +61,15 @@ typedef int (*func_set_element_head_locked_t)(audio_renderer_base_t *base,
 typedef int (*func_set_head_rotation_t)(audio_renderer_base_t *base,
                                         const quaternion_t *rotation);
 
-typedef uint32_t (*func_get_channels_t)(audio_renderer_base_t *base);
+typedef uint32_t (*func_get_channel_count_t)(audio_renderer_base_t *base);
 
 typedef void (*func_metadatas_elapse_t)(audio_renderer_base_t *base,
                                         uint32_t samples_per_channel);
 
-typedef int (*func_get_element_channels_t)(audio_renderer_base_t *base,
-                                           uint32_t element_id);
+typedef uint32_t (*func_get_element_channel_count_t)(
+    audio_renderer_base_t *base, uint32_t element_id);
+
+typedef uint32_t (*func_get_element_count_t)(audio_renderer_base_t *base);
 
 // AudioRendererAPI structure definition
 struct AudioRendererAPI {
@@ -82,9 +84,10 @@ struct AudioRendererAPI {
   func_render_t render;
   func_enable_head_tracking_t enable_head_tracking;
   func_set_head_rotation_t set_head_rotation;
-  func_get_channels_t get_channels;
+  func_get_channel_count_t get_channel_count;
   func_metadatas_elapse_t metadatas_elapse;
-  func_get_element_channels_t get_element_channels;
+  func_get_element_channel_count_t get_element_channel_count;
+  func_get_element_count_t get_element_count;
 };
 
 #ifdef __cplusplus

@@ -283,6 +283,16 @@ int audio_elements_renderer_remove_element(audio_renderer_base_t *base,
   self->channels_count -= removed_channels;
   self->elements_updated = 1;
 
+  /* Free the staging buffer to prevent stale data from being rendered.
+   * The next add_data call will reallocate it with the updated channels_count.
+   */
+  if (self->base.block.data) {
+    def_free(self->base.block.data);
+    self->base.block.data = NULL;
+    self->base.block.channels = 0;
+    self->base.block.samples_per_channel = 0;
+  }
+
   info("Removed element %u from binaural renderer, remaining elements: %d",
        element_id, vector_size(self->elements));
 
@@ -487,19 +497,27 @@ int audio_elements_renderer_set_element_head_locked(audio_renderer_base_t *base,
   return ck_oar_error_notsup;
 }
 
-uint32_t audio_elements_renderer_get_channels(audio_renderer_base_t *base) {
+uint32_t audio_elements_renderer_get_channel_count(
+    audio_renderer_base_t *base) {
   audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
   return self->channels_count;
 }
 
-int audio_elements_renderer_get_element_channels(audio_renderer_base_t *base,
-                                                 uint32_t element_id) {
+uint32_t audio_elements_renderer_get_element_count(
+    audio_renderer_base_t *base) {
+  audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
+  if (!self || !self->elements) return 0;
+  return (uint32_t)vector_size(self->elements);
+}
+
+uint32_t audio_elements_renderer_get_element_channel_count(
+    audio_renderer_base_t *base, uint32_t element_id) {
   audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
   if (!self) return 0;
 
   audio_element_context_t *ctx = def_value_wrap_optional_type_ptr(
       audio_element_context_t, hash_map_get(self->element_map, element_id));
-  return ctx ? (int)rid_channels_count(ctx->rid) : 0;
+  return ctx ? rid_channels_count(ctx->rid) : 0;
 }
 
 void audio_elements_renderer_metadatas_elapse(audio_renderer_base_t *base,
@@ -558,8 +576,10 @@ audio_renderer_base_t *audio_elements_renderer_create_wrapper(
         .set_element_head_locked =
             audio_elements_renderer_set_element_head_locked,
         .set_head_rotation = audio_renderer_set_head_rotation,
-        .get_channels = audio_elements_renderer_get_channels,
-        .get_element_channels = audio_elements_renderer_get_element_channels,
+        .get_channel_count = audio_elements_renderer_get_channel_count,
+        .get_element_channel_count =
+            audio_elements_renderer_get_element_channel_count,
+        .get_element_count = audio_elements_renderer_get_element_count,
         .metadatas_elapse = audio_elements_renderer_metadatas_elapse,
     };
 

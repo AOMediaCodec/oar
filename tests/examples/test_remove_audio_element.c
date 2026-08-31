@@ -311,14 +311,13 @@ static int test_binaural_remove_all_and_readd(void) {
   /* Step 2: Remove element 1 (now the last), verify renderer is retained.
    * The binaural renderer is NOT destroyed when all elements are removed —
    * its lifecycle is tied to the audio group. oar_get_number_of_audio_elements
-   * returns the renderer count (1 = the empty binaural renderer). */
+   * returns the actual element count (0 = no elements, but renderer exists). */
   ret = oar_remove_audio_element(oar, 1);
   TEST_ASSERT(ret == 0, "remove element 1 failed");
 
   uint32_t count = oar_get_number_of_audio_elements(oar);
-  TEST_ASSERT(count == 1,
-              "binaural renderer should be retained after removing all "
-              "elements (count=1)");
+  TEST_ASSERT(count == 0,
+              "element count should be 0 after removing all elements");
 
   ch = oar_get_number_of_audio_element_channels(oar, 1);
   TEST_ASSERT(ch == 0, "removed element should have 0 channels");
