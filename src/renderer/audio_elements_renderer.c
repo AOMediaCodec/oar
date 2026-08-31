@@ -304,7 +304,7 @@ int audio_elements_renderer_add_data(audio_renderer_base_t *base,
     if (!self->base.block.data) {
       debug("channels %d, samples %d", self->channels_count,
             block->samples_per_channel);
-      self->base.block.data = def_malloc(
+      self->base.block.data = def_mallocz(
           float, (self->channels_count * block->samples_per_channel));
       if (!self->base.block.data) {
         return ck_oar_error_nomem;
@@ -319,6 +319,11 @@ int audio_elements_renderer_add_data(audio_renderer_base_t *base,
 
       if (!data) return ck_oar_error_nomem;
       self->base.block.data = data;
+      memset((self->base.block.data +
+              self->base.block.channels * self->base.block.samples_per_channel),
+             0,
+             ((self->channels_count - self->base.block.channels) *
+              self->base.block.samples_per_channel * sizeof(float)));
     }
     self->base.block.channels = self->channels_count;
     self->elements_updated = 0;
@@ -393,6 +398,12 @@ int audio_elements_renderer_render(audio_renderer_base_t *base,
     wav_writer_write(self->rendered, output_block->data,
                      output_block->samples_per_channel, output_block->channels);
 #endif
+
+  if (self->base.block.data) {
+    memset(self->base.block.data, 0,
+           self->base.block.channels * self->base.block.samples_per_channel *
+               sizeof(float));
+  }
 
   return ret;
 }

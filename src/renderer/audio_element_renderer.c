@@ -210,7 +210,7 @@ audio_element_renderer_t *audio_element_renderer_new(
   info("Using self library %s for stream %u", self->base.lib->id, id);
   self->base.block.channels = audio_element_renderer_get_channels(&self->base);
   self->base.block.samples_per_channel = oar_config->samples_per_channel;
-  self->base.block.data = def_malloc(
+  self->base.block.data = def_mallocz(
       float, self->base.block.channels * self->base.block.samples_per_channel);
   if (!self->base.block.data) {
     audio_element_renderer_delete(&self->base);
@@ -363,6 +363,12 @@ int audio_element_renderer_render(audio_renderer_base_t *base,
     wav_writer_write(self->rendered, out_block->data,
                      out_block->samples_per_channel, out_block->channels);
 #endif
+
+  if (self->base.block.data) {
+    memset(self->base.block.data, 0,
+           self->base.block.channels * self->base.block.samples_per_channel *
+               sizeof(float));
+  }
 
   return ret;
 }
