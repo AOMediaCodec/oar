@@ -156,9 +156,11 @@ void oar_destroy(oar_t *oar);
 /**
  * @brief     Add an audio group
  * @param     [in] oar : OAR object
- * @return    Group ID (0-1) on success, negative error code on failure
- *            -1 for invalid parameters, -12 for memory allocation failure,
- *            -16 if maximum number of groups (2) already reached
+ * @return    Group ID (0-1) on success, negative error code on failure:
+ *            ck_oar_error_inval (-22) for invalid parameters,
+ *            ck_oar_error_busy (-16) if max groups (2) reached,
+ *            ck_oar_error_nomem (-12) for memory allocation failure,
+ *            ck_oar_error_notsup (-95) if binaural renderer creation fails
  */
 int oar_add_audio_group(oar_t *oar);
 
@@ -168,8 +170,10 @@ int oar_add_audio_group(oar_t *oar);
  * @param     [in] gid : Group ID where the element will be added
  * @param     [in] id : Unique element id (must be unique across all groups)
  * @param     [in] config : Element configuration
- * @return    0 on success, -1 for invalid parameters, -12 for memory allocation
- *            failure.
+ * @return    ck_oar_ok (0) on success, negative error code on failure:
+ *            ck_oar_error_inval (-22) for invalid parameters or non-existent
+ *            group, ck_oar_error_busy (-16) if element ID already exists,
+ *            ck_oar_error_nomem (-12) for memory allocation failure
  */
 int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
                           const oar_audio_element_config_t *config);
@@ -178,7 +182,17 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
  * @brief     Remove an audio element
  * @param     [in] oar : OAR object
  * @param     [in] id : Unique element id (searched across all groups)
- * @return    0 on success, -1 for invalid parameters or if ID doesn't exist
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters or non-existent ID. ck_oar_error_notsup (-95) for
+ *            unsupported removal order
+ * @note      For binaural (multi-element) renderers, only the specified element
+ *            is removed — the renderer itself is retained and its lifecycle is
+ *            tied to the audio group. For single-element renderers, the entire
+ *            renderer is destroyed
+ * @note      The binaural renderer library (OBR) only supports LIFO (last-in,
+ *            first-out) element removal. Attempting to remove a non-last
+ *            element will return ck_oar_error_notsup and the element remains
+ *            active. Rendering is unaffected by a failed removal
  */
 int oar_remove_audio_element(oar_t *oar, uint32_t id);
 
@@ -187,7 +201,8 @@ int oar_remove_audio_element(oar_t *oar, uint32_t id);
  * @param     [in] oar : OAR object
  * @param     [in] id : Unique element id (searched across all groups)
  * @param     [in] metadata : Metadata to update
- * @return    0 on success, -1 for invalid parameters or if ID doesn't exist
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters or non-existent ID
  */
 int oar_update_audio_element_metadata(oar_t *oar, uint32_t id,
                                       const oar_metadata_t *metadata);
@@ -197,7 +212,8 @@ int oar_update_audio_element_metadata(oar_t *oar, uint32_t id,
  * @param     [in] oar : OAR object
  * @param     [in] id : Unique element id (searched across all groups)
  * @param     [in] data : Audio data in planar format
- * @return    0 on success, -1 for invalid parameters or if ID doesn't exist
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters or non-existent ID
  */
 int oar_update_audio_element_data(oar_t *oar, uint32_t id,
                                   oar_audio_block_t *data);
@@ -213,8 +229,9 @@ int oar_update_audio_element_data(oar_t *oar, uint32_t id,
  * @param     [in] type : Metadata type to configure (currently only
  *                        ck_metadata_object_positions supported)
  * @param     [in] samples : Number of samples to process as a unit
- * @return    0 on success, -1 for invalid parameters, -18 for unsupported
- *            metadata type
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters, ck_oar_error_notsup (-95) for unsupported metadata
+ *            type
  * @note      Currently only ck_metadata_object_positions is supported.
  *            samples must be in range (0, samples_per_channel].
  *            For non-binaural rendering, this controls sub-frame position
@@ -234,8 +251,12 @@ int oar_set_metadata_unit_to_process(oar_t *oar, oar_metadata_type_t type,
  * @param     [in] gid : Group ID to update metadata for
  * @param     [in] metadata : Metadata to update (only ck_metadata_gain type
  *                            supported)
- * @return    0 on success, -1 for invalid parameters or if group ID doesn't
- *            exist
+ * @return    ck_oar_ok (0) on success, negative error code on failure:
+ *            ck_oar_error_inval (-22) for invalid parameters or non-existent
+ *            group ID, ck_oar_error_nomem (-12) for memory allocation failure,
+ *            ck_oar_error_busy (-16) if head rotation is provided without head
+ *            tracking enabled, ck_oar_error_notsup (-95) for unsupported
+ *            metadata type
  */
 int oar_update_metadata(oar_t *oar, uint32_t gid,
                         const oar_metadata_t *metadata);
@@ -244,7 +265,9 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
  * @brief     Perform rendering
  * @param     [in] oar : OAR object
  * @param     [out] output : Output audio data in planar format.
- * @return    0 on success, -1 for invalid parameters
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters (including channel/sample mismatch or no audio groups),
+ *            ck_oar_error_nomem (-12) for memory allocation failure
  * @note      Renders all audio groups. For single group, uses zero-copy
  *            optimization. For multiple groups, mixes all group outputs.
  */
@@ -254,7 +277,8 @@ int oar_render(oar_t *oar, oar_audio_block_t *output);
  * @brief     Enable/disable loudness processor
  * @param     [in] oar : OAR object
  * @param     [in] enable : 1 to enable, 0 to disable
- * @return    0 on success, -1 for invalid parameters
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters
  * @note      When enabled, applies group-specific loudness gain during
  *            rendering
  */
@@ -266,8 +290,8 @@ int oar_enable_loudness_processor(oar_t *oar, int enable);
  * @param     [in] gid : Group ID to set loudness for
  * @param     [in] loudness : current loudness in dB
  * @param     [in] target_loudness : Target loudness in dB
- * @return    0 on success, -1 for invalid parameters or if group ID doesn't
- *            exist
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters or non-existent group ID
  */
 int oar_set_loudness(oar_t *oar, uint32_t gid, float loudness,
                      float target_loudness);
@@ -276,7 +300,8 @@ int oar_set_loudness(oar_t *oar, uint32_t gid, float loudness,
  * @brief     Enable/disable limiter
  * @param     [in] oar : OAR object
  * @param     [in] enable : 1 to enable, 0 to disable
- * @return    0 on success, -1 for invalid parameters
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters
  */
 int oar_enable_limiter(oar_t *oar, int enable);
 
@@ -291,7 +316,9 @@ int oar_enable_limiter(oar_t *oar, int enable);
  *
  * @param     [in] oar : OAR object
  * @param     [in] enable : 1 to enable, 0 to disable
- * @return    0 on success, -1 for invalid parameters
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters, ck_oar_error_notsup (-95) if target layout is not
+ *            binaural
  * @note      Applies to all audio elements across all groups. Only supported
  *            for binaural layout.
  */
