@@ -246,10 +246,6 @@ int audio_elements_renderer_remove_element(audio_renderer_base_t *base,
     return ck_oar_error_inval;
   }
 
-  /* Notify the underlying renderer library to release per-element DSP
-   * resources.  If the library does not support removal (e.g., OBR only
-   * supports LIFO), abort the removal so that OAR and library state stay
-   * consistent.  The element remains functional and rendering is unaffected. */
   if (self->base.lib && self->base.lib->set_attribute) {
     uint32_t lib_index = ctx->index;
     int ret = self->base.lib->set_attribute(
