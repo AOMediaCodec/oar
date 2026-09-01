@@ -453,7 +453,6 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
   if (metadata->type == ck_metadata_gain) {
     clone = metadata_clone(metadata);
     if (!clone) return ck_oar_error_nomem;
-    metadata_gain_linear(clone);
 
     if (group->output_gain.metadatas) {
       if (queue_push(group->output_gain.metadatas,
