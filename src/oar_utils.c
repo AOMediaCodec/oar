@@ -443,49 +443,6 @@ void metadata_delete(oar_metadata_t *metadata) {
   def_free(metadata);
 }
 
-int metadata_gain_linear(oar_metadata_t *metadata) {
-  if (!metadata || metadata->type != ck_metadata_gain) {
-    return ck_oar_error_inval;
-  }
-
-  switch (metadata->gain.param_type) {
-    case ck_param_constant:
-      // Convert constant gain from dB to linear
-      metadata->gain.constant_gain =
-          db_to_linear_float32(metadata->gain.constant_gain);
-      break;
-
-    case ck_param_multiple:
-      // Convert each gain value in the array from dB to linear
-      if (metadata->gain.gain_array && metadata->duration > 0) {
-        for (int i = 0; i < metadata->duration; i++) {
-          metadata->gain.gain_array[i] =
-              db_to_linear_float32(metadata->gain.gain_array[i]);
-        }
-      }
-      break;
-
-    case ck_param_animated:
-      // Convert animated gain values from dB to linear
-      metadata->gain.animated_gains.data.start =
-          db_to_linear_float32(metadata->gain.animated_gains.data.start);
-      metadata->gain.animated_gains.data.end =
-          db_to_linear_float32(metadata->gain.animated_gains.data.end);
-      // For bezier animation, also convert the control point
-      if (metadata->gain.animated_gains.animation_type ==
-          ck_animation_type_bezier) {
-        metadata->gain.animated_gains.data.control =
-            db_to_linear_float32(metadata->gain.animated_gains.data.control);
-      }
-      break;
-
-    default:
-      return ck_oar_error_inval;
-  }
-
-  return ck_oar_ok;
-}
-
 float db_to_linear_float32(float db) { return powf(10.0f, 0.05f * db); }
 
 #ifdef __as_dbg__

@@ -132,7 +132,6 @@ int audio_element_context_update_gain(audio_element_context_t *ctx,
 
   clone = metadata_clone(metadata);
   if (!clone) return ck_oar_error_nomem;
-  metadata_gain_linear(clone);
   queue_push(gain->metadatas, def_value_wrap_instance_ptr(clone));
   gain->duration += metadata->duration;
 
@@ -203,6 +202,11 @@ int audio_block_sub_frames_apply_gain(oar_audio_block_t *block,
 
   if (!gain_item || !gain_item->metadatas) return ck_oar_error_inval;
 
+  /* Cache: avoid repeated db_to_linear_float32() for constant/step gain
+   * across multiple sub-frames within the same metadata */
+  oar_metadata_t *cached_metadata = NULL;
+  float cached_linear_gain = 1.0f;
+
   while (processed_samples < total_samples) {
     float cumulative_gain = 1.0f;
     uint32_t current_unit_samples = sub_frame_samples;
@@ -225,35 +229,61 @@ int audio_block_sub_frames_apply_gain(oar_audio_block_t *block,
         float gain_value = 1.0f;
 
         if (metadata->gain.param_type == ck_param_constant) {
-          gain_value = metadata->gain.constant_gain;
+          /* constant gain is unchanged across sub-frames, cache it */
+          if (metadata != cached_metadata) {
+            cached_linear_gain =
+                db_to_linear_float32(metadata->gain.constant_gain);
+            cached_metadata = metadata;
+          }
+          gain_value = cached_linear_gain;
         } else if (metadata->gain.param_type == ck_param_multiple) {
+          cached_metadata =
+              NULL; /* multiple gain varies per sample, no cache */
           uint32_t relative_pos = sample_gain_position - accumulated_duration;
           if (relative_pos < metadata->duration && metadata->gain.gain_array) {
-            gain_value = metadata->gain.gain_array[relative_pos];
+            gain_value =
+                db_to_linear_float32(metadata->gain.gain_array[relative_pos]);
           } else {
             warning("Gain array out of bounds for metadata id %u",
                     metadata->gain.id);
           }
         } else if (metadata->gain.param_type == ck_param_animated) {
+          /* Default to 0 dB (unity) if no animation type matches */
+          gain_value = 0.0f;
           uint32_t relative_pos = sample_gain_position - accumulated_duration;
           if (metadata->gain.animated_gains.animation_type ==
-              ck_animation_type_step)
-            gain_value = metadata->gain.animated_gains.data.start;
-          else if (metadata->gain.animated_gains.animation_type ==
-                   ck_animation_type_linear) {
-            gain_value = animated_bezier_linear_calculate(
-                &metadata->gain.animated_gains.data,
-                bezier_linear_factor_get(metadata->duration, relative_pos));
-          } else if (metadata->gain.animated_gains.animation_type ==
-                     ck_animation_type_bezier) {
-            gain_value = animated_bezier_quadratic_calculate(
-                &metadata->gain.animated_gains.data,
-                bezier_quadratic_factor_get(
-                    0,
-                    metadata->gain.animated_gains.data.control_relative_time *
-                            metadata->duration +
-                        0.5f,
-                    metadata->duration, relative_pos));
+              ck_animation_type_step) {
+            /* step gain is unchanged across sub-frames, cache it */
+            if (metadata != cached_metadata) {
+              cached_linear_gain = db_to_linear_float32(
+                  metadata->gain.animated_gains.data.start);
+              cached_metadata = metadata;
+            }
+            gain_value = cached_linear_gain;
+          } else {
+            cached_metadata = NULL; /* linear/bezier varies, no cache */
+            if (metadata->gain.animated_gains.animation_type ==
+                ck_animation_type_linear) {
+              gain_value = animated_bezier_linear_calculate(
+                  &metadata->gain.animated_gains.data,
+                  bezier_linear_factor_get(metadata->duration, relative_pos));
+            } else if (metadata->gain.animated_gains.animation_type ==
+                       ck_animation_type_bezier) {
+              gain_value = animated_bezier_quadratic_calculate(
+                  &metadata->gain.animated_gains.data,
+                  bezier_quadratic_factor_get(
+                      0,
+                      metadata->gain.animated_gains.data.control_relative_time *
+                              metadata->duration +
+                          0.5f,
+                      metadata->duration, relative_pos));
+            } else {
+              warning("Unknown animation type %d for gain metadata id %u",
+                      metadata->gain.animated_gains.animation_type,
+                      metadata->gain.id);
+            }
+            /* Interpolate in dB domain, then convert to linear */
+            gain_value = db_to_linear_float32(gain_value);
           }
         }
 

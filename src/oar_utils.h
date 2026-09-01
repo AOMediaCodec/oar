@@ -46,7 +46,6 @@ polar_t cartesian_to_polar_sector_float32(cartesian_t cartesian);
 // Metadata utility functions
 oar_metadata_t *metadata_clone(const oar_metadata_t *metadata);
 void metadata_delete(oar_metadata_t *metadata);
-int metadata_gain_linear(oar_metadata_t *metadata);
 
 float db_to_linear_float32(float db);
 
