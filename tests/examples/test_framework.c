@@ -6,7 +6,7 @@
  * License was not distributed with this source code in the LICENSE file, you
  * can obtain it at www.aomedia.org/license/software-license/bsd-3-c-c. If the
  * Alliance for Open Media Patent License 1.0 was not distributed with this
- * source code in the PATENTS file, you can obtain it at
+ * source code in the LICENSE file, you can obtain it at
  * www.aomedia.org/license/patent.
  */
 
@@ -65,7 +65,20 @@ static int run_test_in_child(test_entry_t *tests, int num_tests,
 
   /* Parent: wait for the child and interpret the exit status. */
   int status = 0;
-  waitpid(pid, &status, 0);
+  int r;
+  /**
+   * Retry waitpid if interrupted by a signal (EINTR). The loop exits when:
+   * - waitpid succeeds (r >= 0), or
+   * - waitpid fails with an error other than EINTR (e.g. ECHILD, EINVAL).
+   * This cannot deadlock: the child process will eventually terminate
+   * (exit, crash, or SIGKILL), so waitpid will ultimately succeed.
+   * */
+  while ((r = waitpid(pid, &status, 0)) < 0 && errno == EINTR) {
+  }
+  if (r < 0) {
+    perror("waitpid");
+    return TEST_FAIL;
+  }
 
   if (WIFEXITED(status)) {
     int exit_code = WEXITSTATUS(status);

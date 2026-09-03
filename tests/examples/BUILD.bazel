@@ -1,10 +1,26 @@
-load("@rules_cc//cc:defs.bzl", "cc_test")
+load("@rules_cc//cc:defs.bzl", "cc_test", "cc_library")
+
+# Shared test infrastructure: test_framework + test_helpers
+cc_library(
+    name = "oar_test_common",
+    srcs = [
+        "test_framework.c",
+        "test_helpers.c",
+    ],
+    hdrs = [
+        "test_framework.h",
+        "test_helpers.h",
+    ],
+    deps = [
+        "//:oar",
+    ],
+)
 
 cc_test(
     name = "test_audio_element_types",
     srcs = ["test_audio_element_types.c"],
     deps = [
-        "//:oar",
+        ":oar_test_common",
     ],
 )
 
@@ -12,7 +28,7 @@ cc_test(
     name = "test_channel_based_rendering",
     srcs = ["test_channel_based_rendering.c"],
     deps = [
-        "//:oar",
+        ":oar_test_common",
     ],
 )
 
@@ -28,7 +44,7 @@ cc_test(
         "//conditions:default": ["@platforms//:incompatible"],
     }),
     deps = [
-        "//:oar",
+        ":oar_test_common",
     ],
 )
 
@@ -36,7 +52,7 @@ cc_test(
     name = "test_object_based_rendering",
     srcs = ["test_object_based_rendering.c"],
     deps = [
-        "//:oar",
+        ":oar_test_common",
     ],
 )
 
@@ -44,7 +60,7 @@ cc_test(
     name = "test_scene_based_rendering",
     srcs = ["test_scene_based_rendering.c"],
     deps = [
-        "//:oar",
+        ":oar_test_common",
     ],
 )
 
@@ -52,19 +68,15 @@ cc_test(
     name = "test_metadata_unit_processing",
     srcs = ["test_metadata_unit_processing.c"],
     deps = [
-        "//:oar",
+        ":oar_test_common",
     ],
 )
 
 cc_test(
     name = "test_remove_audio_element",
-    srcs = [
-        "test_remove_audio_element.c",
-        "test_framework.c",
-        "test_framework.h",
-    ],
+    srcs = ["test_remove_audio_element.c"],
     deps = [
-        "//:oar",
+        ":oar_test_common",
     ],
 )
 
