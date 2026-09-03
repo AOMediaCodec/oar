@@ -59,20 +59,6 @@
  * for them to count as "different". */
 #define TEST_MIN_RELATIVE_DIFF 0.05
 
-/* --- Signal generation helpers ------------------------------------------ */
-
-/* Head-shadow ILD is weak below ~1.5 kHz, so a pure 440 Hz tone would make
- * the interaural asymmetry checks in TC13/TC14 fragile. Use a stimulus with
- * both low- and high-frequency content instead. */
-static void generate_test_stimulus(float *buffer, uint32_t samples,
-                                   float sample_rate) {
-  for (uint32_t i = 0; i < samples; ++i) {
-    float t = (float)i / sample_rate;
-    buffer[i] = 0.45f * (float)sin(2.0 * M_PI * 440.0 * t) +
-                0.45f * (float)sin(2.0 * M_PI * 3500.0 * t);
-  }
-}
-
 /* --- Metadata helpers --------------------------------------------------- */
 
 static int submit_position(oar_t *oar, uint32_t element_id, float azimuth,
@@ -171,8 +157,8 @@ static int submit_stimulus_block(oar_t *oar, uint32_t element_id,
   if (alloc_audio_block(channels, samples, &block) != 0) return -1;
 
   for (uint32_t c = 0; c < channels; ++c) {
-    generate_test_stimulus(block.data + c * samples, samples,
-                           (float)TEST_SAMPLING_RATE);
+    generate_dual_tone_stimulus(block.data + c * samples, samples,
+                                (float)TEST_SAMPLING_RATE, 440.0f, 3500.0f);
   }
 
   int ret = oar_update_audio_element_data(oar, element_id, &block);

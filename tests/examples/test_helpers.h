@@ -49,6 +49,13 @@ void generate_sine(float *buffer, uint32_t samples, float freq, float rate);
 void generate_sine_channel(float *buffer, uint32_t samples, uint32_t channels,
                            uint32_t ch_idx, float freq, float rate);
 
+/** Generate a composite dual-tone test stimulus into a single-channel buffer.
+ *  The broad-band content ensures frequency-dependent effects (e.g.
+ *  head-shadow ILD) are exercised. */
+void generate_dual_tone_stimulus(float *buffer, uint32_t samples,
+                                 float sample_rate, float freq_low,
+                                 float freq_high);
+
 /* --- Element config helpers --------------------------------------------- */
 
 /** Create a zeroed object-based element config with num_objects objects. */

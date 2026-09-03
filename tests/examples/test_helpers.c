@@ -44,6 +44,16 @@ void generate_sine_channel(float *buffer, uint32_t samples, uint32_t channels,
   }
 }
 
+void generate_dual_tone_stimulus(float *buffer, uint32_t samples,
+                                 float sample_rate, float freq_low,
+                                 float freq_high) {
+  for (uint32_t i = 0; i < samples; ++i) {
+    float t = (float)i / sample_rate;
+    buffer[i] = 0.45f * (float)sin(2.0 * M_PI * freq_low * t) +
+                0.45f * (float)sin(2.0 * M_PI * freq_high * t);
+  }
+}
+
 /* --- Element config helpers --------------------------------------------- */
 
 oar_audio_element_config_t create_object_element_config(int num_objects) {
