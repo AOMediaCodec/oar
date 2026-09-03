@@ -1,68 +1,35 @@
 # CMakeLists.txt for tests/examples
 
-# Add the test for audio_element_type_t
-add_executable(test_audio_element_types test_audio_element_types.c)
-
-# Add the test for channel-based rendering
-add_executable(test_channel_based_rendering test_channel_based_rendering.c)
-
-# Add the test for scene-based rendering
-add_executable(test_scene_based_rendering test_scene_based_rendering.c)
-
-# Add the test for object-based rendering
-add_executable(test_object_based_rendering test_object_based_rendering.c)
-
-# Add the test for metadata unit processing (binaural OBR sub-frame)
-add_executable(test_metadata_unit_processing test_metadata_unit_processing.c)
-
-# Add the test for audio element removal
-add_executable(test_remove_audio_element test_remove_audio_element.c
-                                               test_framework.c)
-
-# Link the tests against the main oar library.
-# The 'oar' target is defined in the parent CMakeLists.txt,
-# so it's accessible here.
-target_link_libraries(test_audio_element_types PRIVATE oar)
-target_link_libraries(test_channel_based_rendering PRIVATE oar)
-target_link_libraries(test_scene_based_rendering PRIVATE oar)
-target_link_libraries(test_object_based_rendering PRIVATE oar)
-target_link_libraries(test_metadata_unit_processing PRIVATE oar)
-target_link_libraries(test_remove_audio_element PRIVATE oar)
-
-# Register tests with CTest so they run automatically in CI.
-add_test(NAME test_audio_element_types COMMAND test_audio_element_types)
-add_test(NAME test_channel_based_rendering COMMAND test_channel_based_rendering)
-add_test(NAME test_scene_based_rendering COMMAND test_scene_based_rendering)
-add_test(NAME test_object_based_rendering COMMAND test_object_based_rendering)
-add_test(NAME test_metadata_unit_processing COMMAND test_metadata_unit_processing)
-add_test(NAME test_remove_audio_element COMMAND test_remove_audio_element)
-
-# Include directories are inherited from the parent project,
-# so oar.h and other headers should be found automatically.
-
-# Enable C99 standard for the tests. Also link math library for sine wave.
-set_property(TARGET test_audio_element_types PROPERTY C_STANDARD 99)
-set_property(TARGET test_channel_based_rendering PROPERTY C_STANDARD 99)
-set_property(TARGET test_scene_based_rendering PROPERTY C_STANDARD 99)
-set_property(TARGET test_object_based_rendering PROPERTY C_STANDARD 99)
-set_property(TARGET test_metadata_unit_processing PROPERTY C_STANDARD 99)
-set_property(TARGET test_remove_audio_element PROPERTY C_STANDARD 99)
-
+# --- Shared test infrastructure -------------------------------------------
+# Build test_framework.c and test_helpers.c into a static library so that
+# each test target only needs its own .c file + link oar_test_common.
+add_library(oar_test_common STATIC test_framework.c test_helpers.c)
+target_link_libraries(oar_test_common PUBLIC oar)
+set_property(TARGET oar_test_common PROPERTY C_STANDARD 99)
 if(NOT MSVC)
-  target_link_libraries(test_channel_based_rendering PRIVATE m)
-  target_link_libraries(test_scene_based_rendering PRIVATE m)
-  target_link_libraries(test_object_based_rendering PRIVATE m)
-  target_link_libraries(test_metadata_unit_processing PRIVATE m)
-  target_link_libraries(test_remove_audio_element PRIVATE m)
+  target_link_libraries(oar_test_common PUBLIC m)
 endif()
+
+# --- Helper function -------------------------------------------------------
+# Creates a test executable, links it, and registers it with CTest.
+function(oar_add_test name)
+  add_executable(${name} ${name}.c)
+  target_link_libraries(${name} PRIVATE oar_test_common)
+  set_property(TARGET ${name} PROPERTY C_STANDARD 99)
+  add_test(NAME ${name} COMMAND ${name})
+endfunction()
+
+# --- Test targets ---------------------------------------------------------
+
+oar_add_test(test_audio_element_types)
+oar_add_test(test_channel_based_rendering)
+oar_add_test(test_scene_based_rendering)
+oar_add_test(test_object_based_rendering)
+oar_add_test(test_metadata_unit_processing)
+oar_add_test(test_remove_audio_element)
 
 # The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
 # into the library when OAR_ENABLE_HOA_LFE is ON.
 if(OAR_ENABLE_HOA_LFE)
-    add_executable(test_hoa_lfe_rendering test_hoa_lfe_rendering.c)
-    target_link_libraries(test_hoa_lfe_rendering PRIVATE oar)
-    if(NOT MSVC)
-        target_link_libraries(test_hoa_lfe_rendering PRIVATE m)
-    endif()
-    set_property(TARGET test_hoa_lfe_rendering PROPERTY C_STANDARD 99)
+  oar_add_test(test_hoa_lfe_rendering)
 endif()
