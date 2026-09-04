@@ -8,6 +8,10 @@ standardises how test cases are declared, executed, and reported, and provides
 **crash isolation** so that a single test failure (including SIGABRT or
 segfault) does not prevent subsequent tests from running.
 
+A companion module (`test_helpers.h` / `test_helpers.c`) provides shared
+utility functions — signal generation, config/element creation, metadata
+helpers, and output verification — that are common across multiple test files.
+
 ## Key Features
 
 - **Assertion macros** — `TEST_ASSERT`, `TEST_ASSERT_EQ`, `TEST_ASSERT_NE`
@@ -17,6 +21,8 @@ segfault) does not prevent subsequent tests from running.
   Windows `_spawnl`)
 - **Cross-platform** — works on Linux, macOS, and Windows (MSVC)
 - **Summary report** — per-test PASSED/FAILED/CRASHED status table
+- **Shared helpers** — `test_helpers.c` provides signal generation, config
+  creation, metadata helpers, and output verification utilities
 
 ## Quick Start
 
@@ -54,24 +60,26 @@ int main(int argc, char *argv[]) {
 
 ### 4. Build
 
-Add the test source file and `test_framework.c` to the build:
+`test_framework.c` and `test_helpers.c` are compiled into a shared static
+library (`oar_test_common`). Each test target only needs its own `.c` file
+linked against `oar_test_common`.
 
 **CMake** (`CMakeLists.txt`):
 ```cmake
-add_executable(test_my_feature test_my_feature.c test_framework.c)
-target_link_libraries(test_my_feature PRIVATE oar)
-set_property(TARGET test_my_feature PROPERTY C_STANDARD 99)
+# The shared library is already defined at the top of CMakeLists.txt:
+# add_library(oar_test_common STATIC test_framework.c test_helpers.c)
+# target_link_libraries(oar_test_common PUBLIC oar)
+
+# To add a new test, use the helper function:
+oar_add_test(test_my_feature)
 ```
 
 **Bazel** (`BUILD.bazel`):
 ```python
 cc_test(
     name = "test_my_feature",
-    srcs = [
-        "test_my_feature.c",
-        "test_framework.c",
-    ],
-    deps = ["//:oar"],
+    srcs = ["test_my_feature.c"],
+    deps = [":oar_test_common"],
 )
 ```
 
@@ -117,8 +125,9 @@ This means a test that calls `abort()` or segfaults will be reported as
 
 1. Create `test_my_feature.c` in `tests/examples/`
 2. `#include "test_framework.h"` and the OAR headers you need
+   - Include `test_helpers.h` if you need shared utility functions
 3. Write test functions returning `TEST_PASS` / `TEST_FAIL`
 4. Declare a `g_tests[]` array with `TEST_ENTRY` macros
 5. Write `main()` calling `run_all_tests()`
-6. Add the executable to `CMakeLists.txt` and `BUILD.bazel` (include
-   `test_framework.c` in the sources)
+6. Add the test to `CMakeLists.txt` (via `oar_add_test()`) and `BUILD.bazel`
+   (via `cc_test` with `deps = [":oar_test_common"]`)
