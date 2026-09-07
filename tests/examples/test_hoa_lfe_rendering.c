@@ -145,6 +145,7 @@ static int test_lfe_level_sampling_rate_invariant(void) {
   const double ratio_96k = rms_96k / rms_48k;
   const double ratio_44k = rms_44k / rms_48k;
 
+  printf("  ratio_96k=%.6f, ratio_44k=%.6f\n", ratio_96k, ratio_44k);
   TEST_ASSERT(
       fabs(ratio_96k - 1.0) <= 0.05,
       "LFE level depends on sampling rate (96k/48k ratio out of range)");
@@ -174,6 +175,8 @@ static int test_lfe_lowpass_attenuation(void) {
     TEST_ASSERT(rms_high > 0.0, "high-tone render failed");
 
     const double attenuation_db = 20.0 * log10(rms_high / rms_low);
+    printf("  %uHz: rms_low=%.6f, rms_high=%.6f, atten=%.6f dB\n", rates[i],
+           rms_low, rms_high, attenuation_db);
     TEST_ASSERT(attenuation_db <= -25.0,
                 "insufficient LFE low-pass attenuation");
   }

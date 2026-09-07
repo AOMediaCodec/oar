@@ -6,7 +6,7 @@
  * License was not distributed with this source code in the LICENSE file, you
  * can obtain it at www.aomedia.org/license/software-license/bsd-3-c-c. If the
  * Alliance for Open Media Patent License 1.0 was not distributed with this
- * source code in the LICENSE file, you can obtain it at
+ * source code in the PATENTS file, you can obtain it at
  * www.aomedia.org/license/patent.
  */
 
@@ -354,8 +354,18 @@ static int test_binaural_readd_determinism(int head_tracking) {
   if (head_tracking) {
     int ret = oar_enable_head_tracking(oar, 1);
     TEST_ASSERT(ret == 0, "oar_enable_head_tracking failed");
+  }
 
-    /* Set 90° yaw rotation: quaternion (cos(45°), 0, sin(45°), 0) */
+  /* Add object element at 45° azimuth (non-center position for meaningful
+   * binaural rendering; rotation effect only applies when head_tracking=1) */
+  oar_audio_element_config_t elem_cfg = create_object_element_config(1);
+  int ret = oar_add_audio_element(oar, gid, 1, &elem_cfg);
+  TEST_ASSERT(ret == 0, "add element failed");
+
+  if (head_tracking) {
+    /* Set 90° yaw rotation: quaternion (cos(45°), 0, sin(45°), 0)
+     * Submitted after oar_add_audio_element so that OBR is open and
+     * the rotation is actually applied to the renderer. */
     oar_metadata_t rot_meta;
     memset(&rot_meta, 0, sizeof(rot_meta));
     rot_meta.type = ck_metadata_head_rotation;
@@ -368,12 +378,6 @@ static int test_binaural_readd_determinism(int head_tracking) {
     ret = oar_update_metadata(oar, gid, &rot_meta);
     TEST_ASSERT(ret == 0, "oar_update_metadata for head rotation failed");
   }
-
-  /* Add object element at 45° azimuth (non-center position for meaningful
-   * binaural rendering; rotation effect only applies when head_tracking=1) */
-  oar_audio_element_config_t elem_cfg = create_object_element_config(1);
-  int ret = oar_add_audio_element(oar, gid, 1, &elem_cfg);
-  TEST_ASSERT(ret == 0, "add element failed");
 
   polar_t pos = {45.0f, 0.0f, 1.0f};
   oar_metadata_t *pos_meta = create_object_metadata(&pos, 1, 256);
@@ -420,10 +424,8 @@ static int test_binaural_readd_determinism(int head_tracking) {
   double diff = sum_abs_diff(out_a.data, out_b.data, total);
 
   double signal_level = 0.0;
-  if (head_tracking) {
-    for (uint32_t i = 0; i < total; ++i)
-      signal_level += fabs((double)out_a.data[i]);
-  }
+  for (uint32_t i = 0; i < total; ++i)
+    signal_level += fabs((double)out_a.data[i]);
 
   free(out_a.data);
   free(out_b.data);
@@ -435,7 +437,8 @@ static int test_binaural_readd_determinism(int head_tracking) {
     TEST_ASSERT(diff / signal_level < 0.01,
                 "head rotation state lost: outputs differ after re-add");
   } else {
-    printf("  diff=%.6f\n", diff);
+    printf("  diff=%.6f, signal=%.6f\n", diff, signal_level);
+    TEST_ASSERT(signal_level > 0, "signal level should be non-zero");
     TEST_ASSERT(diff < 1e-4,
                 "outputs should be identical without head tracking");
   }

@@ -6,7 +6,7 @@
  * License was not distributed with this source code in the LICENSE file, you
  * can obtain it at www.aomedia.org/license/software-license/bsd-3-c-c. If the
  * Alliance for Open Media Patent License 1.0 was not distributed with this
- * source code in the LICENSE file, you can obtain it at
+ * source code in the PATENTS file, you can obtain it at
  * www.aomedia.org/license/patent.
  */
 
@@ -197,8 +197,8 @@ static double rms_diff(const float *a, const float *b, uint32_t count) {
 static int create_binaural_oar_with_element(oar_t **out_oar,
                                             uint32_t *out_channels,
                                             float **out_input_data) {
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   if (!oar) return -1;
 
@@ -220,8 +220,8 @@ static int create_binaural_oar_with_element(oar_t **out_oar,
  * each), and copy the last rendered frame into `out`
  * (2 * TEST_SAMPLES_PER_CHANNEL floats, planar). */
 static int render_binaural_frames(float azimuth, int frames, float *out) {
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   if (!oar) return -1;
 
@@ -273,8 +273,8 @@ done:
  * (2 * TEST_SAMPLES_PER_CHANNEL floats, planar). */
 static int render_multi_element_multi_object(float az1, float az2_obj1,
                                              float az2_obj2, float *out) {
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   if (!oar) return -1;
 
@@ -383,8 +383,8 @@ static int test_set_metadata_equal_after_add_group(void) {
 static int test_set_metadata_stereo(void) {
   TEST_START("TC3: set_metadata(32) with stereo layout");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_stereo, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_stereo, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -416,8 +416,8 @@ static int test_set_metadata_stereo(void) {
 static int test_set_metadata_before_add_group_binaural(void) {
   TEST_START("TC4: set_metadata(32) before add_group (binaural)");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -449,8 +449,8 @@ static int test_set_metadata_before_add_group_binaural(void) {
 static int test_default_no_set_metadata_binaural(void) {
   TEST_START("TC5: default (no set_metadata call, binaural)");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -482,8 +482,8 @@ static int test_invalid_parameters(void) {
                                              TEST_SUB_FRAME_SAMPLES);
   TEST_ASSERT(ret != 0, "set_metadata(NULL) succeeded, expected error");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -500,8 +500,8 @@ static int test_invalid_parameters(void) {
 static int test_multiple_set_metadata_before_add_group(void) {
   TEST_START("TC7: multiple set_metadata before add_group");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -537,8 +537,8 @@ static int test_multiple_set_metadata_before_add_group(void) {
 static int test_binaural_non_divisor_accepted(void) {
   TEST_START("TC8: binaural non-divisor accepted");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -554,8 +554,8 @@ static int test_binaural_non_divisor_accepted(void) {
 static int test_zero_samples_rejected(void) {
   TEST_START("TC9: zero samples rejected");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -571,8 +571,8 @@ static int test_zero_samples_rejected(void) {
 static int test_exceeds_frame_rejected(void) {
   TEST_START("TC10: samples > frame rejected");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -588,8 +588,8 @@ static int test_exceeds_frame_rejected(void) {
 static int test_stereo_non_divisor_accepted(void) {
   TEST_START("TC11: stereo non-divisor accepted");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_stereo, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_stereo, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -605,8 +605,8 @@ static int test_stereo_non_divisor_accepted(void) {
 static int test_stereo_varying_positions_sub_frame(void) {
   TEST_START("TC12: stereo varying positions sub-frame");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_stereo, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_stereo, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -662,6 +662,9 @@ static int test_stereo_varying_positions_sub_frame(void) {
     right_second_half += fabsf(output.data[TEST_SAMPLES_PER_CHANNEL + i]);
   }
 
+  printf("  L: first=%.6f, second=%.6f | R: first=%.6f, second=%.6f\n",
+         left_first_half, left_second_half, right_first_half,
+         right_second_half);
   TEST_ASSERT(left_first_half > left_second_half,
               "sub-frame position update not reflected in left channel");
   TEST_ASSERT(right_second_half > right_first_half,
@@ -697,6 +700,9 @@ static int test_binaural_position_effect(void) {
   double sig = rms_of(render_left, total);
   double diff = rms_diff(render_left, render_right, total);
 
+  printf("  sig=%.6f, diff=%.6f, ratio=%.6f\n", sig, diff,
+         sig > 0 ? diff / sig : 0.0);
+
   TEST_ASSERT(sig >= 1e-6, "binaural output is silent");
   TEST_ASSERT(diff >= TEST_MIN_RELATIVE_DIFF * sig,
               "renders at +80° and -80° are near-identical; positions not "
@@ -708,6 +714,11 @@ static int test_binaural_position_effect(void) {
   double e_l_neg = sum_abs(render_right, TEST_SAMPLES_PER_CHANNEL);
   double e_r_neg = sum_abs(render_right + TEST_SAMPLES_PER_CHANNEL,
                            TEST_SAMPLES_PER_CHANNEL);
+
+  printf("  +80°: E_L=%.6f, E_R=%.6f, ratio=%.6f\n", e_l_pos, e_r_pos,
+         e_r_pos > 0 ? e_l_pos / e_r_pos : 0.0);
+  printf("  -80°: E_L=%.6f, E_R=%.6f, ratio=%.6f\n", e_l_neg, e_r_neg,
+         e_l_neg > 0 ? e_r_neg / e_l_neg : 0.0);
 
   TEST_ASSERT(e_l_pos > TEST_ILD_RATIO * e_r_pos,
               "interaural asymmetry does not follow azimuth sign (+80°)");
@@ -729,8 +740,8 @@ static int test_binaural_position_effect(void) {
 static int test_binaural_position_update_across_frames(void) {
   TEST_START("TC14: binaural position update across frames");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -777,7 +788,15 @@ static int test_binaural_position_update_across_frames(void) {
   double e_r_f3 =
       sum_abs(frame3 + TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLES_PER_CHANNEL);
 
+  printf("  sig=%.6f, diff=%.6f, ratio=%.6f\n", sig, diff,
+         sig > 0 ? diff / sig : 0.0);
+  printf("  frame1 (+80°): E_L=%.6f, E_R=%.6f, ratio=%.6f\n", e_l_f1, e_r_f1,
+         e_r_f1 > 0 ? e_l_f1 / e_r_f1 : 0.0);
+  printf("  frame3 (-80°): E_L=%.6f, E_R=%.6f, ratio=%.6f\n", e_l_f3, e_r_f3,
+         e_l_f3 > 0 ? e_r_f3 / e_l_f3 : 0.0);
+
   TEST_ASSERT(sig >= 1e-6, "binaural output is silent");
+
   TEST_ASSERT(diff >= TEST_MIN_RELATIVE_DIFF * sig,
               "output did not change after the position update");
   TEST_ASSERT(
@@ -800,8 +819,8 @@ static int test_binaural_position_update_across_frames(void) {
 static int test_undersized_block_rejected(void) {
   TEST_START("TC15: undersized input block rejected");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -838,8 +857,8 @@ static int test_undersized_block_rejected(void) {
 static int test_mismatched_blocks_across_elements(void) {
   TEST_START("TC16: mismatched blocks across elements rejected");
 
-  oar_config_t config =
-      create_config(ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, 48000);
+  oar_config_t config = create_config(
+      ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -922,11 +941,18 @@ static int test_multi_element_rendering(void) {
   double ild_same = fabs(e_l_same - e_r_same) / (e_l_same + e_r_same + 1e-12);
   double ild_opp = fabs(e_l_opp - e_r_opp) / (e_l_opp + e_r_opp + 1e-12);
 
+  printf("  sig_same=%.6f, sig_opp=%.6f\n", sig_same, sig_opposite);
+  printf("  same: E_L=%.6f, E_R=%.6f, ILD=%.6f\n", e_l_same, e_r_same,
+         ild_same);
+  printf("  opp:  E_L=%.6f, E_R=%.6f, ILD=%.6f\n", e_l_opp, e_r_opp, ild_opp);
+
   TEST_ASSERT(ild_same > ild_opp,
               "ILD not stronger when both elements share azimuth");
 
   /* 3. The two renders must differ (proves element 2's data affects output). */
   double diff = rms_diff(render_opposite, render_same, total);
+  printf("  diff=%.6f, ratio=%.6f\n", diff,
+         sig_same > 0 ? diff / sig_same : 0.0);
   TEST_ASSERT(diff >= TEST_MIN_RELATIVE_DIFF * sig_same,
               "opposite and same-azimuth renders are near-identical");
 
