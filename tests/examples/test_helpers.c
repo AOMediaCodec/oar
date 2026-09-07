@@ -37,7 +37,7 @@ void generate_sine(float *buffer, uint32_t samples, float freq, float rate) {
 
 void generate_sine_channel(float *buffer, uint32_t samples, uint32_t channels,
                            uint32_t ch_idx, float freq, float rate) {
-  (void)channels; /* channels unused; ch_idx * samples is the planar offset */
+  if (ch_idx >= channels) return; /* boundary check */
   for (uint32_t i = 0; i < samples; ++i) {
     buffer[ch_idx * samples + i] =
         (float)sin(2.0 * M_PI * freq * ((float)i / rate));
@@ -133,8 +133,8 @@ int alloc_audio_block(uint32_t channels, uint32_t samples_per_channel,
 int render_and_check_non_silent(oar_t *oar, oar_audio_block_t *output) {
   memset(output->data, 0,
          output->channels * output->samples_per_channel * sizeof(float));
-  if (oar_render(oar, output) != 0) return -1;
+  if (oar_render(oar, output) != 0) return RENDER_CHECK_RENDER_ERR;
   uint32_t total = output->channels * output->samples_per_channel;
-  if (!is_output_non_silent(output->data, total)) return -1;
-  return 0;
+  if (!is_output_non_silent(output->data, total)) return RENDER_CHECK_SILENT;
+  return RENDER_CHECK_OK;
 }

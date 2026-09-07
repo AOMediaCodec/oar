@@ -90,8 +90,14 @@ int is_output_non_silent(const float *data, uint32_t count);
 int alloc_audio_block(uint32_t channels, uint32_t samples_per_channel,
                       oar_audio_block_t *output);
 
+#define RENDER_CHECK_OK 0
+#define RENDER_CHECK_RENDER_ERR (-1)
+#define RENDER_CHECK_SILENT (-2)
+
 /** Zero the output buffer, render, and verify the output is non-silent.
- *  @return 0 on success, -1 on render failure or silent output. */
+ *  @return RENDER_CHECK_OK on success,
+ *          RENDER_CHECK_RENDER_ERR on render failure,
+ *          RENDER_CHECK_SILENT on silent output. */
 int render_and_check_non_silent(oar_t *oar, oar_audio_block_t *output);
 
 #endif /* OAR_TEST_HELPERS_H */

@@ -123,5 +123,7 @@ endif()
 install(DIRECTORY include/ DESTINATION include/oar)
 
 if(OAR_BUILD_EXAMPLES)
+    enable_testing()
     add_subdirectory(tests/examples)
 endif()
+
