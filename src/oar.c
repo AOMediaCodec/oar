@@ -320,6 +320,14 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
             ? 1
             : 0;
     renderer->impl->set_element_head_locked(renderer, id, lock);
+
+    /* Re-apply head rotation: when the binaural group was drained to zero
+     * elements and is re-opened, the OBR handle is recreated and the
+     * previously set rotation is lost. oar->head_rotation always holds the
+     * latest value, so re-apply it here. */
+    if (oar->enable_head_tracking)
+      renderer->impl->set_head_rotation(renderer, &oar->head_rotation);
+
     return ck_oar_ok;
   }
 
@@ -453,7 +461,6 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
   if (metadata->type == ck_metadata_gain) {
     clone = metadata_clone(metadata);
     if (!clone) return ck_oar_error_nomem;
-    metadata_gain_linear(clone);
 
     if (group->output_gain.metadatas) {
       if (queue_push(group->output_gain.metadatas,
