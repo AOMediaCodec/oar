@@ -4,7 +4,7 @@ def _pffft_ext_impl(mctx):
     new_git_repository(
         name = "pffft",
         remote = "https://bitbucket.org/jpommier/pffft.git",
-        commit = "d7a4c0206a29423478776d6b23a37bbb308f21d5",
+        commit = "0aec0327a6912e1a0ec5326eef737c2ce19bc836",
         # Repository-qualified on purpose: a bare `//external:pffft.BUILD`
         # resolves against the main repository rather than against the module
         # this file belongs to, so it breaks as soon as obr is consumed as a

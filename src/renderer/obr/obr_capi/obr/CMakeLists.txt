@@ -58,7 +58,7 @@ FetchContent_MakeAvailable(eigen)
 FetchContent_Declare(
         pffft
         GIT_REPOSITORY https://bitbucket.org/jpommier/pffft.git
-        GIT_TAG 180c2d62717c0150d8aebd165fce19ee4e5f86f9
+        GIT_TAG 0aec0327a6912e1a0ec5326eef737c2ce19bc836
 )
 FetchContent_MakeAvailable(pffft)
 
