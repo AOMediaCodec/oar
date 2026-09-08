@@ -45,8 +45,8 @@
 #include "test_framework.h"
 #include "test_helpers.h"
 
-#define TEST_SAMPLING_RATE 48000
 #define TEST_SAMPLES_PER_CHANNEL 512
+
 #define TEST_SUB_FRAME_SAMPLES 32
 #define TEST_SUB_FRAME_SAMPLES_ALT 64
 #define TEST_ELEMENT_ID 1
@@ -60,16 +60,6 @@
 #define TEST_MIN_RELATIVE_DIFF 0.05
 
 /* --- Metadata helpers --------------------------------------------------- */
-
-static int submit_position(oar_t *oar, uint32_t element_id, float azimuth,
-                           uint32_t duration) {
-  polar_t position = {azimuth, 0.0f, 1.0f};
-  oar_metadata_t *meta = create_object_metadata(&position, 1, duration);
-  if (!meta) return -1;
-  int ret = oar_update_audio_element_metadata(oar, element_id, meta);
-  free(meta);
-  return ret;
-}
 
 /* Submit position metadata with two objects at different azimuths for a
  * num_objects=2 element. Both objects share the same duration. */
@@ -98,11 +88,13 @@ static int add_object_element_to_group(oar_t *oar, int gid, uint32_t element_id,
 
 /* Adds an object-based element (num_objects=1), fills all input channels with
  * a sine wave, optionally attaches a default position metadata, and submits
- * the data. Returns 0 on success; caller frees *out_input_data. */
+ * the data. Returns 0 on success, ck_oar_error_notsup when the binaural
+ * renderer is unavailable (caller should SKIP), -1 on other failures; caller
+ * frees *out_input_data. */
 static int add_object_element(oar_t *oar, uint32_t *out_channels,
                               float **out_input_data, int add_position) {
   int gid = oar_add_audio_group(oar);
-  if (gid < 0) return -1;
+  if (gid < 0) return gid; /* Propagate the error code (notsup → SKIP). */
 
   if (add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) != 0) return -1;
 
@@ -126,15 +118,8 @@ static int add_object_element(oar_t *oar, uint32_t *out_channels,
 
   if (add_position) {
     polar_t position = {30.0f, 0.0f, 1.0f};
-    oar_metadata_t *pos_meta =
-        create_object_metadata(&position, 1, TEST_SAMPLES_PER_CHANNEL);
-    if (!pos_meta) {
-      free(input_data.data);
-      return -1;
-    }
-    int ret = oar_update_audio_element_metadata(oar, TEST_ELEMENT_ID, pos_meta);
-    free(pos_meta);
-    if (ret != 0) {
+    if (set_object_position(oar, TEST_ELEMENT_ID, &position,
+                            TEST_SAMPLES_PER_CHANNEL) != 0) {
       free(input_data.data);
       return -1;
     }
@@ -168,12 +153,6 @@ static int submit_stimulus_block(oar_t *oar, uint32_t element_id,
 
 /* --- Measurement helpers ------------------------------------------------ */
 
-static double sum_abs(const float *data, uint32_t count) {
-  double sum = 0.0;
-  for (uint32_t i = 0; i < count; ++i) sum += fabs(data[i]);
-  return sum;
-}
-
 static double rms_of(const float *data, uint32_t count) {
   double sum = 0.0;
   for (uint32_t i = 0; i < count; ++i) sum += (double)data[i] * data[i];
@@ -193,7 +172,9 @@ static double rms_diff(const float *a, const float *b, uint32_t count) {
 
 /* Create a binaural OAR instance with a single object element (with default
  * position) and return it along with the output channel count and input data
- * pointer (caller frees input_data). Returns 0 on success. */
+ * pointer (caller frees input_data). Returns 0 on success, -1 on failure,
+ * ck_oar_error_notsup when the binaural renderer is unavailable (caller
+ * should SKIP). */
 static int create_binaural_oar_with_element(oar_t **out_oar,
                                             uint32_t *out_channels,
                                             float **out_input_data) {
@@ -202,23 +183,24 @@ static int create_binaural_oar_with_element(oar_t **out_oar,
   oar_t *oar = oar_create(&config);
   if (!oar) return -1;
 
-  uint32_t out_ch = 0;
-  float *input_data = NULL;
-  if (add_object_element(oar, &out_ch, &input_data, 1) != 0) {
+  /* add_object_element() creates its own group and propagates the group
+   * creation error code (notsup → SKIP). */
+  int ret = add_object_element(oar, out_channels, out_input_data, 1);
+  if (ret != 0) {
     oar_destroy(oar);
-    return -1;
+    return ret; /* Propagate the error code (notsup → SKIP). */
   }
 
   *out_oar = oar;
-  *out_channels = out_ch;
-  *out_input_data = input_data;
   return 0;
 }
 
 /* Create a binaural renderer with a single object at the given azimuth,
  * render `frames` full frames (resubmitting stimulus and position before
  * each), and copy the last rendered frame into `out`
- * (2 * TEST_SAMPLES_PER_CHANNEL floats, planar). */
+ * (2 * TEST_SAMPLES_PER_CHANNEL floats, planar). Returns 0 on success, -1 on
+ * failure, ck_oar_error_notsup when the binaural renderer is unavailable
+ * (caller should SKIP). */
 static int render_binaural_frames(float azimuth, int frames, float *out) {
   oar_config_t config = create_config(
       ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
@@ -226,8 +208,11 @@ static int render_binaural_frames(float azimuth, int frames, float *out) {
   if (!oar) return -1;
 
   int gid = oar_add_audio_group(oar);
-  if (gid < 0 ||
-      add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) != 0) {
+  if (gid < 0) {
+    oar_destroy(oar);
+    return gid; /* Propagate the error code (notsup → SKIP). */
+  }
+  if (add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) != 0) {
     oar_destroy(oar);
     return -1;
   }
@@ -249,9 +234,12 @@ static int render_binaural_frames(float azimuth, int frames, float *out) {
     if (submit_stimulus_block(oar, TEST_ELEMENT_ID, TEST_SAMPLES_PER_CHANNEL) !=
         0)
       goto done;
-    if (submit_position(oar, TEST_ELEMENT_ID, azimuth,
-                        TEST_SAMPLES_PER_CHANNEL) != 0)
-      goto done;
+    {
+      polar_t pos = {azimuth, 0.0f, 1.0f};
+      if (set_object_position(oar, TEST_ELEMENT_ID, &pos,
+                              TEST_SAMPLES_PER_CHANNEL) != 0)
+        goto done;
+    }
     memset(output.data, 0,
            out_channels * TEST_SAMPLES_PER_CHANNEL * sizeof(float));
     if (oar_render(oar, &output) != 0) goto done;
@@ -270,7 +258,9 @@ done:
 /* Create a binaural renderer with two object-based elements, where element 1
  * has num_objects=1 and element 2 has num_objects=2. Submit data and positions
  * for both, render two frames, and copy the last frame into `out`
- * (2 * TEST_SAMPLES_PER_CHANNEL floats, planar). */
+ * (2 * TEST_SAMPLES_PER_CHANNEL floats, planar). Returns 0 on success, -1 on
+ * failure, ck_oar_error_notsup when the binaural renderer is unavailable
+ * (caller should SKIP). */
 static int render_multi_element_multi_object(float az1, float az2_obj1,
                                              float az2_obj2, float *out) {
   oar_config_t config = create_config(
@@ -279,8 +269,11 @@ static int render_multi_element_multi_object(float az1, float az2_obj1,
   if (!oar) return -1;
 
   int gid = oar_add_audio_group(oar);
-  if (gid < 0 ||
-      add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) != 0 ||
+  if (gid < 0) {
+    oar_destroy(oar);
+    return gid; /* Propagate the error code (notsup → SKIP). */
+  }
+  if (add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) != 0 ||
       add_object_element_to_group(oar, gid, TEST_ELEMENT_ID_2, 2) != 0) {
     oar_destroy(oar);
     return -1;
@@ -306,9 +299,12 @@ static int render_multi_element_multi_object(float az1, float az2_obj1,
     if (submit_stimulus_block(oar, TEST_ELEMENT_ID_2,
                               TEST_SAMPLES_PER_CHANNEL) != 0)
       goto done;
-    if (submit_position(oar, TEST_ELEMENT_ID, az1, TEST_SAMPLES_PER_CHANNEL) !=
-        0)
-      goto done;
+    {
+      polar_t pos = {az1, 0.0f, 1.0f};
+      if (set_object_position(oar, TEST_ELEMENT_ID, &pos,
+                              TEST_SAMPLES_PER_CHANNEL) != 0)
+        goto done;
+    }
     if (submit_position_dual(oar, TEST_ELEMENT_ID_2, az2_obj1, az2_obj2,
                              TEST_SAMPLES_PER_CHANNEL) != 0)
       goto done;
@@ -336,9 +332,9 @@ static int test_set_metadata_after_add_group_binaural(void) {
   oar_t *oar = NULL;
   uint32_t out_channels = 0;
   float *input_data = NULL;
-  TEST_ASSERT(
-      create_binaural_oar_with_element(&oar, &out_channels, &input_data) == 0,
-      "Failed to setup binaural OAR");
+  TEST_SKIP_IF_NOTSUP(
+      create_binaural_oar_with_element(&oar, &out_channels, &input_data),
+      "binaural not supported");
 
   int ret = oar_set_metadata_unit_to_process(oar, ck_metadata_object_positions,
                                              TEST_SUB_FRAME_SAMPLES);
@@ -356,9 +352,9 @@ static int test_set_metadata_equal_after_add_group(void) {
   oar_t *oar = NULL;
   uint32_t out_channels = 0;
   float *input_data = NULL;
-  TEST_ASSERT(
-      create_binaural_oar_with_element(&oar, &out_channels, &input_data) == 0,
-      "Failed to setup binaural OAR");
+  TEST_SKIP_IF_NOTSUP(
+      create_binaural_oar_with_element(&oar, &out_channels, &input_data),
+      "binaural not supported");
 
   int ret = oar_set_metadata_unit_to_process(oar, ck_metadata_object_positions,
                                              TEST_SAMPLES_PER_CHANNEL);
@@ -427,8 +423,8 @@ static int test_set_metadata_before_add_group_binaural(void) {
 
   uint32_t out_channels = 0;
   float *input_data = NULL;
-  TEST_ASSERT(add_object_element(oar, &out_channels, &input_data, 1) == 0,
-              "add_object_element failed");
+  TEST_SKIP_IF_NOTSUP(add_object_element(oar, &out_channels, &input_data, 1),
+                      "binaural not supported");
 
   oar_audio_block_t output;
   TEST_ASSERT(
@@ -456,8 +452,8 @@ static int test_default_no_set_metadata_binaural(void) {
 
   uint32_t out_channels = 0;
   float *input_data = NULL;
-  TEST_ASSERT(add_object_element(oar, &out_channels, &input_data, 1) == 0,
-              "add_object_element failed");
+  TEST_SKIP_IF_NOTSUP(add_object_element(oar, &out_channels, &input_data, 1),
+                      "binaural not supported");
 
   oar_audio_block_t output;
   TEST_ASSERT(
@@ -515,8 +511,8 @@ static int test_multiple_set_metadata_before_add_group(void) {
 
   uint32_t out_channels = 0;
   float *input_data = NULL;
-  TEST_ASSERT(add_object_element(oar, &out_channels, &input_data, 1) == 0,
-              "add_object_element failed");
+  TEST_SKIP_IF_NOTSUP(add_object_element(oar, &out_channels, &input_data, 1),
+                      "binaural not supported");
 
   oar_audio_block_t output;
   TEST_ASSERT(
@@ -685,17 +681,17 @@ static int test_stereo_varying_positions_sub_frame(void) {
  * the azimuth sign (positive azimuth = left, as in TC12). */
 static int test_binaural_position_effect(void) {
   TEST_START("TC13: binaural mirrored positions (±80°)");
-
   uint32_t total = 2 * TEST_SAMPLES_PER_CHANNEL;
   float *render_left = (float *)calloc(total, sizeof(float));
   float *render_right = (float *)calloc(total, sizeof(float));
   TEST_ASSERT(render_left != NULL && render_right != NULL, "calloc failed");
 
   /* Render the second frame so the measurement is past the onset. */
-  TEST_ASSERT(render_binaural_frames(TEST_SIDE_AZIMUTH, 2, render_left) == 0,
-              "binaural render (+azimuth) failed");
-  TEST_ASSERT(render_binaural_frames(-TEST_SIDE_AZIMUTH, 2, render_right) == 0,
-              "binaural render (-azimuth) failed");
+  TEST_SKIP_IF_NOTSUP(render_binaural_frames(TEST_SIDE_AZIMUTH, 2, render_left),
+                      "binaural not supported");
+  TEST_SKIP_IF_NOTSUP(
+      render_binaural_frames(-TEST_SIDE_AZIMUTH, 2, render_right),
+      "binaural not supported");
 
   double sig = rms_of(render_left, total);
   double diff = rms_diff(render_left, render_right, total);
@@ -739,14 +735,13 @@ static int test_binaural_position_effect(void) {
  * crossfade inside OBR does not blur the measurement. */
 static int test_binaural_position_update_across_frames(void) {
   TEST_START("TC14: binaural position update across frames");
-
   oar_config_t config = create_config(
       ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
   int gid = oar_add_audio_group(oar);
-  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
+  TEST_SKIP_IF_NOTSUP(gid, "binaural not supported");
   TEST_ASSERT(add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) == 0,
               "add_object_element_to_group failed");
 
@@ -770,9 +765,12 @@ static int test_binaural_position_update_across_frames(void) {
     TEST_ASSERT(submit_stimulus_block(oar, TEST_ELEMENT_ID,
                                       TEST_SAMPLES_PER_CHANNEL) == 0,
                 "data update failed");
-    TEST_ASSERT(submit_position(oar, TEST_ELEMENT_ID, azimuths[f],
-                                TEST_SAMPLES_PER_CHANNEL) == 0,
-                "metadata update failed");
+    {
+      polar_t pos = {azimuths[f], 0.0f, 1.0f};
+      TEST_ASSERT(set_object_position(oar, TEST_ELEMENT_ID, &pos,
+                                      TEST_SAMPLES_PER_CHANNEL) == 0,
+                  "metadata update failed");
+    }
     memset(output.data, 0, total * sizeof(float));
     TEST_ASSERT(oar_render(oar, &output) == 0, "oar_render failed");
     if (f == 0) memcpy(frame1, output.data, total * sizeof(float));
@@ -818,14 +816,13 @@ static int test_binaural_position_update_across_frames(void) {
  * ABSL_CHECK_EQ on the buffer size aborts the whole process. */
 static int test_undersized_block_rejected(void) {
   TEST_START("TC15: undersized input block rejected");
-
   oar_config_t config = create_config(
       ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
   int gid = oar_add_audio_group(oar);
-  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
+  TEST_SKIP_IF_NOTSUP(gid, "binaural not supported");
   TEST_ASSERT(add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) == 0,
               "add_object_element_to_group failed");
 
@@ -856,14 +853,13 @@ static int test_undersized_block_rejected(void) {
  * block with the first block's stride/allocation — a heap buffer overflow. */
 static int test_mismatched_blocks_across_elements(void) {
   TEST_START("TC16: mismatched blocks across elements rejected");
-
   oar_config_t config = create_config(
       ck_oar_layout_binaural, TEST_SAMPLES_PER_CHANNEL, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
   int gid = oar_add_audio_group(oar);
-  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
+  TEST_SKIP_IF_NOTSUP(gid, "binaural not supported");
   TEST_ASSERT(add_object_element_to_group(oar, gid, TEST_ELEMENT_ID, 1) == 0,
               "add element 1 failed");
   TEST_ASSERT(add_object_element_to_group(oar, gid, TEST_ELEMENT_ID_2, 1) == 0,
@@ -902,7 +898,6 @@ static int test_mismatched_blocks_across_elements(void) {
  *      output. */
 static int test_multi_element_rendering(void) {
   TEST_START("TC17: multi-element + multi-object rendering");
-
   uint32_t total = 2 * TEST_SAMPLES_PER_CHANNEL;
   float *render_opposite = (float *)calloc(total, sizeof(float));
   float *render_same = (float *)calloc(total, sizeof(float));
@@ -910,17 +905,17 @@ static int test_multi_element_rendering(void) {
 
   /* Render with split objects: element 1 at +80°, element 2's two objects
    * at +80° and -80°. Element 2's objects span both sides, weakening ILD. */
-  TEST_ASSERT(render_multi_element_multi_object(
-                  TEST_SIDE_AZIMUTH, TEST_SIDE_AZIMUTH, -TEST_SIDE_AZIMUTH,
-                  render_opposite) == 0,
-              "multi-element render (split) failed");
+  TEST_SKIP_IF_NOTSUP(
+      render_multi_element_multi_object(TEST_SIDE_AZIMUTH, TEST_SIDE_AZIMUTH,
+                                        -TEST_SIDE_AZIMUTH, render_opposite),
+      "binaural not supported");
 
   /* Render with all objects on same side: element 1 at +80°, element 2's
    * two objects both at +80°. All three objects on the left → strong ILD. */
-  TEST_ASSERT(
+  TEST_SKIP_IF_NOTSUP(
       render_multi_element_multi_object(TEST_SIDE_AZIMUTH, TEST_SIDE_AZIMUTH,
-                                        TEST_SIDE_AZIMUTH, render_same) == 0,
-      "multi-element render (same) failed");
+                                        TEST_SIDE_AZIMUTH, render_same),
+      "binaural not supported");
 
   /* 1. Both renders must be non-silent. */
   double sig_opposite = rms_of(render_opposite, total);

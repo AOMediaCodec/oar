@@ -92,6 +92,7 @@ cc_test(
 | `TEST_ASSERT(cond, msg)` | Assert `cond` is true; on failure, print `msg` + line number and return `TEST_FAIL` |
 | `TEST_ASSERT_EQ(actual, expected, msg)` | Assert `actual == expected` |
 | `TEST_ASSERT_NE(actual, unexpected, msg)` | Assert `actual != unexpected` |
+| `TEST_SKIP_IF_NOTSUP(ret, msg)` | Skip the test when `ret` is exactly `ck_oar_error_notsup` (optional feature not built in); any other negative value fails the test, printing the actual error code |
 | `TEST_START(name)` | Print a visual separator with the test name (optional) |
 | `TEST_ENTRY(name, desc, fn)` | Initialise a `test_entry_t` |
 | `NUM_TESTS(array)` | Number of elements in a static test array |

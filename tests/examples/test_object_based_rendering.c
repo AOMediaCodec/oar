@@ -120,7 +120,8 @@ static int add_object_element_with_data(oar_t *oar, uint32_t element_id,
 
   for (int i = 0; i < num_objects; ++i) {
     generate_sine(input_data.data + (uint32_t)i * samples_per_channel,
-                  samples_per_channel, frequencies[i], 48000.0f);
+                  samples_per_channel, frequencies[i],
+                  (float)TEST_SAMPLING_RATE);
   }
 
   ret = oar_update_audio_element_data(oar, element_id, &input_data);
@@ -142,7 +143,8 @@ static int add_object_element_with_data(oar_t *oar, uint32_t element_id,
 static int test_single_object(void) {
   TEST_START("TC1: single object rendering");
 
-  oar_config_t oar_cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t oar_cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&oar_cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -170,7 +172,8 @@ static int test_single_object(void) {
 static int test_two_objects_one_element(void) {
   TEST_START("TC2: two objects in one element");
 
-  oar_config_t oar_cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t oar_cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&oar_cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -198,7 +201,8 @@ static int test_two_objects_one_element(void) {
 static int test_two_objects_separate_elements(void) {
   TEST_START("TC3: two objects in separate elements");
 
-  oar_config_t oar_cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t oar_cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&oar_cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -232,7 +236,8 @@ static int test_two_objects_separate_elements(void) {
 static int test_animated_object(void) {
   TEST_START("TC4: animated object positions");
 
-  oar_config_t oar_cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t oar_cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&oar_cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -249,7 +254,7 @@ static int test_animated_object(void) {
   oar_audio_block_t input_data;
   TEST_ASSERT(alloc_audio_block(1, spc, &input_data) == 0,
               "alloc_audio_block failed");
-  generate_sine(input_data.data, spc, 440.0f, 48000.0f);
+  generate_sine(input_data.data, spc, 440.0f, (float)TEST_SAMPLING_RATE);
   ret = oar_update_audio_element_data(oar, 5, &input_data);
   free(input_data.data);
   TEST_ASSERT(ret == 0, "oar_update_audio_element_data failed");
@@ -278,58 +283,95 @@ static int test_animated_object(void) {
   return TEST_PASS;
 }
 
-/* TC5: Object with gain metadata (−6 dB) */
+/* TC5: Object with gain metadata (−6 dB) — verify gain actually attenuates */
 static int test_object_with_gain(void) {
   TEST_START("TC5: object with gain");
 
-  oar_config_t oar_cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t oar_cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
+
+  /* --- Baseline render: no gain metadata --- */
+  oar_t *oar_base = oar_create(&oar_cfg);
+  TEST_ASSERT(oar_base != NULL, "oar_create failed (baseline)");
+
+  uint32_t spc = oar_get_samples_per_channel(oar_base);
+  uint32_t out_ch = oar_get_number_of_output_channels(oar_base);
+
+  int gid = oar_add_audio_group(oar_base);
+  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed (baseline)");
+
+  oar_audio_element_config_t element_cfg = create_object_element_config(1);
+  TEST_ASSERT(oar_add_audio_element(oar_base, gid, 6, &element_cfg) == 0,
+              "oar_add_audio_element failed (baseline)");
+
+  oar_audio_block_t input_base;
+  TEST_ASSERT(alloc_audio_block(1, spc, &input_base) == 0,
+              "alloc_audio_block failed (baseline)");
+  generate_sine(input_base.data, spc, 440.0f, (float)TEST_SAMPLING_RATE);
+  TEST_ASSERT(oar_update_audio_element_data(oar_base, 6, &input_base) == 0,
+              "oar_update_audio_element_data failed (baseline)");
+  free(input_base.data);
+
+  polar_t position = {0.0f, 0.0f, 1.0f};
+  TEST_ASSERT(set_object_position(oar_base, 6, &position, spc) == 0,
+              "position metadata update failed (baseline)");
+
+  oar_audio_block_t output_base;
+  TEST_ASSERT(alloc_audio_block(out_ch, spc, &output_base) == 0,
+              "alloc_audio_block failed (baseline)");
+  TEST_ASSERT(render_and_check_non_silent(oar_base, &output_base) == 0,
+              "baseline render is silent");
+
+  double level_base = sum_abs(output_base.data, out_ch * spc) / (out_ch * spc);
+  free(output_base.data);
+  oar_destroy(oar_base);
+
+  /* --- Gain render: −6 dB gain metadata --- */
   oar_t *oar = oar_create(&oar_cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
-  int gid = oar_add_audio_group(oar);
+  gid = oar_add_audio_group(oar);
   TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
 
-  oar_audio_element_config_t element_cfg = create_object_element_config(1);
-  int ret = oar_add_audio_element(oar, gid, 6, &element_cfg);
-  TEST_ASSERT(ret == 0, "oar_add_audio_element failed");
+  TEST_ASSERT(oar_add_audio_element(oar, gid, 6, &element_cfg) == 0,
+              "oar_add_audio_element failed");
 
-  uint32_t spc = oar_get_samples_per_channel(oar);
-
-  /* Feed sine data */
   oar_audio_block_t input_data;
   TEST_ASSERT(alloc_audio_block(1, spc, &input_data) == 0,
               "alloc_audio_block failed");
-  generate_sine(input_data.data, spc, 440.0f, 48000.0f);
-  ret = oar_update_audio_element_data(oar, 6, &input_data);
+  generate_sine(input_data.data, spc, 440.0f, (float)TEST_SAMPLING_RATE);
+  TEST_ASSERT(oar_update_audio_element_data(oar, 6, &input_data) == 0,
+              "oar_update_audio_element_data failed");
   free(input_data.data);
-  TEST_ASSERT(ret == 0, "oar_update_audio_element_data failed");
 
-  /* Set position metadata */
-  polar_t position = {0.0f, 0.0f, 1.0f};
-  oar_metadata_t *pos_metadata = create_object_metadata(&position, 1, spc);
-  TEST_ASSERT(pos_metadata != NULL, "create_object_metadata failed");
-  ret = oar_update_audio_element_metadata(oar, 6, pos_metadata);
-  free(pos_metadata);
-  TEST_ASSERT(ret == 0, "position metadata update failed");
+  TEST_ASSERT(set_object_position(oar, 6, &position, spc) == 0,
+              "position metadata update failed");
 
-  /* Apply gain (−6.0 dB) */
   oar_metadata_t *gain_metadata = create_gain_metadata(1, -6.0f, spc);
   TEST_ASSERT(gain_metadata != NULL, "create_gain_metadata failed");
-  ret = oar_update_audio_element_metadata(oar, 6, gain_metadata);
+  int ret = oar_update_audio_element_metadata(oar, 6, gain_metadata);
   free(gain_metadata);
   TEST_ASSERT(ret == 0, "gain metadata update failed");
 
-  /* Render and verify */
-  uint32_t out_ch = oar_get_number_of_output_channels(oar);
   oar_audio_block_t output;
   TEST_ASSERT(alloc_audio_block(out_ch, spc, &output) == 0,
               "alloc_audio_block failed");
+  TEST_ASSERT(render_and_check_non_silent(oar, &output) == 0,
+              "render output is silent");
 
-  int result = render_and_check_non_silent(oar, &output);
+  double level_gain = sum_abs(output.data, out_ch * spc) / (out_ch * spc);
   free(output.data);
   oar_destroy(oar);
 
-  TEST_ASSERT(result == 0, "render output is silent");
+  /* −6 dB → linear gain ≈ 0.5012. Allow ±10% tolerance. */
+  printf("  level_base=%.6f, level_gain=%.6f, ratio=%.6f\n", level_base,
+         level_gain, level_base > 0 ? level_gain / level_base : 0.0);
+  TEST_ASSERT(level_base > 0, "baseline level is zero");
+  TEST_ASSERT(level_gain < level_base * 0.55,
+              "gain not applied (output too loud)");
+  TEST_ASSERT(level_gain > level_base * 0.40,
+              "gain over-applied (output too quiet)");
+
   return TEST_PASS;
 }
 
@@ -337,7 +379,8 @@ static int test_object_with_gain(void) {
 static int test_invalid_parameters(void) {
   TEST_START("TC6: invalid parameter handling");
 
-  oar_config_t oar_cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t oar_cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&oar_cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 

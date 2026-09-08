@@ -14,6 +14,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* --- Config helpers ----------------------------------------------------- */
 
@@ -112,6 +113,15 @@ oar_metadata_t *create_object_metadata(const polar_t *positions,
   return metadata;
 }
 
+int set_object_position(oar_t *oar, uint32_t element_id, const polar_t *pos,
+                        uint32_t duration) {
+  oar_metadata_t *meta = create_object_metadata(pos, 1, duration);
+  if (!meta) return -1;
+  int ret = oar_update_audio_element_metadata(oar, element_id, meta);
+  free(meta);
+  return ret;
+}
+
 /* --- Output helpers ------------------------------------------------------ */
 
 int is_output_non_silent(const float *data, uint32_t count) {
@@ -131,10 +141,20 @@ int alloc_audio_block(uint32_t channels, uint32_t samples_per_channel,
 }
 
 int render_and_check_non_silent(oar_t *oar, oar_audio_block_t *output) {
-  memset(output->data, 0,
-         output->channels * output->samples_per_channel * sizeof(float));
+  if (!output || !output->data) return RENDER_CHECK_RENDER_ERR;
+  memset(
+      output->data, 0,
+      (size_t)output->channels * output->samples_per_channel * sizeof(float));
   if (oar_render(oar, output) != 0) return RENDER_CHECK_RENDER_ERR;
   uint32_t total = output->channels * output->samples_per_channel;
   if (!is_output_non_silent(output->data, total)) return RENDER_CHECK_SILENT;
   return RENDER_CHECK_OK;
+}
+
+/* --- Measurement helpers ------------------------------------------------- */
+
+double sum_abs(const float *data, uint32_t count) {
+  double sum = 0.0;
+  for (uint32_t i = 0; i < count; ++i) sum += fabs((double)data[i]);
+  return sum;
 }

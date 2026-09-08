@@ -35,7 +35,8 @@
 static int test_channel_based_element(void) {
   TEST_START("TC1: channel-based element (stereo)");
 
-  oar_config_t config = create_config(ck_oar_layout_stereo, 1024, 48000);
+  oar_config_t config =
+      create_config(ck_oar_layout_stereo, 1024, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -58,7 +59,8 @@ static int test_channel_based_element(void) {
 static int test_scene_based_element(void) {
   TEST_START("TC2: scene-based element (1OA)");
 
-  oar_config_t config = create_config(ck_oar_layout_stereo, 1024, 48000);
+  oar_config_t config =
+      create_config(ck_oar_layout_stereo, 1024, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -80,7 +82,8 @@ static int test_scene_based_element(void) {
 static int test_object_based_element(void) {
   TEST_START("TC3: object-based element (1 object)");
 
-  oar_config_t config = create_config(ck_oar_layout_stereo, 1024, 48000);
+  oar_config_t config =
+      create_config(ck_oar_layout_stereo, 1024, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -102,7 +105,8 @@ static int test_object_based_element(void) {
 static int test_multiple_element_types(void) {
   TEST_START("TC4: multiple element types");
 
-  oar_config_t config = create_config(ck_oar_layout_stereo, 1024, 48000);
+  oar_config_t config =
+      create_config(ck_oar_layout_stereo, 1024, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&config);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 

@@ -70,6 +70,15 @@ static int render_and_verify_non_silent(oar_t *oar, uint32_t element_id,
 
 /* --- Head rotation test helpers ----------------------------------------- */
 
+/* Thresholds for readd determinism comparisons. */
+#define ROTATION_EFFECT_THRESHOLD \
+  0.01 /* A vs C: rotation must have visible effect */
+#define READD_MATCH_THRESHOLD                    \
+  0.01 /* A vs B: outputs should match within 1% \
+        */
+#define NO_TRACKING_DIFF_THRESHOLD \
+  1e-4 /* A vs B without tracking: near-identical */
+
 /* Feed stimulus to element, render, and capture output.
  * Returns 0 on success, -1 on failure. Caller must free out->data. */
 static int render_and_capture(oar_t *oar, uint32_t element_id,
@@ -107,11 +116,47 @@ static double sum_abs_diff(const float *a, const float *b, uint32_t count) {
   return sum;
 }
 
+/* Render the same scene (object at 45° azimuth) without head tracking or
+ * rotation, as an identity-rotation baseline. Returns 0 on success, -1 on
+ * failure. Caller must free out->data. */
+
+static int render_baseline_no_rotation(const oar_config_t *cfg,
+                                       oar_audio_block_t *out) {
+  oar_config_t cfg_c = create_config(
+      cfg->target_layout, cfg->samples_per_channel, cfg->sampling_rate);
+  oar_t *oar_c = oar_create(&cfg_c);
+  if (!oar_c) return -1;
+
+  int gid_c = oar_add_audio_group(oar_c);
+  if (gid_c < 0) {
+    oar_destroy(oar_c);
+    return -1;
+  }
+
+  oar_audio_element_config_t elem_cfg = create_object_element_config(1);
+  if (oar_add_audio_element(oar_c, gid_c, 1, &elem_cfg) != 0) {
+    oar_destroy(oar_c);
+    return -1;
+  }
+
+  polar_t pos = {45.0f, 0.0f, 1.0f};
+  if (set_object_position(oar_c, 1, &pos, cfg->samples_per_channel) != 0) {
+    oar_destroy(oar_c);
+    return -1;
+  }
+
+  uint32_t ch = oar_get_number_of_audio_element_channels(oar_c, 1);
+  int ret = render_and_capture(oar_c, 1, ch, &cfg_c, out);
+  oar_destroy(oar_c);
+  return ret;
+}
+
 /* Scenario 1: Non-binaural — Add then remove a single element */
 static int test_remove_single_element(void) {
   TEST_START("test_remove_single_element");
 
-  oar_config_t cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -149,7 +194,8 @@ static int test_remove_single_element(void) {
 static int test_remove_one_of_multiple_elements(void) {
   TEST_START("test_remove_one_of_multiple_elements");
 
-  oar_config_t cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -193,7 +239,8 @@ static int test_remove_one_of_multiple_elements(void) {
 static int test_readd_after_remove(void) {
   TEST_START("test_readd_after_remove");
 
-  oar_config_t cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 
@@ -223,15 +270,13 @@ static int test_readd_after_remove(void) {
 static int test_binaural_remove_non_lifo(void) {
   TEST_START("test_binaural_remove_non_lifo");
 
-  oar_config_t cfg = create_config(ck_oar_layout_binaural, 256, 48000);
+  oar_config_t cfg =
+      create_config(ck_oar_layout_binaural, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&cfg);
-  if (!oar) {
-    printf("SKIP: binaural not supported\n");
-    return TEST_PASS;
-  }
+  TEST_ASSERT(oar != NULL, "oar_create failed");
 
   int gid = oar_add_audio_group(oar);
-  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
+  TEST_SKIP_IF_NOTSUP(gid, "binaural not supported");
 
   oar_audio_element_config_t elem_cfg =
       create_channel_element_config(ck_oar_layout_mono);
@@ -272,15 +317,13 @@ static int test_binaural_remove_non_lifo(void) {
 static int test_binaural_remove_all_and_readd(void) {
   TEST_START("test_binaural_remove_all_and_readd");
 
-  oar_config_t cfg = create_config(ck_oar_layout_binaural, 256, 48000);
+  oar_config_t cfg =
+      create_config(ck_oar_layout_binaural, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&cfg);
-  if (!oar) {
-    printf("SKIP: binaural not supported\n");
-    return TEST_PASS;
-  }
+  TEST_ASSERT(oar != NULL, "oar_create failed");
 
   int gid = oar_add_audio_group(oar);
-  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
+  TEST_SKIP_IF_NOTSUP(gid, "binaural not supported");
 
   oar_audio_element_config_t elem_cfg =
       create_channel_element_config(ck_oar_layout_mono);
@@ -303,10 +346,12 @@ static int test_binaural_remove_all_and_readd(void) {
               "element 1 should render after LIFO removal of element 2");
 
   /* Step 2: Remove element 1 (now the last), verify renderer is retained.
-   * The binaural renderer is NOT destroyed when all elements are removed —
-   * its lifecycle is tied to the audio group. After removing all elements,
-   * the element count should be 0 (the renderer itself is retained but has
-   * no elements). */
+   * The binaural renderer wrapper is NOT destroyed when all elements are
+   * removed — its lifecycle is tied to the audio group. The renderer is
+   * retained after remove-all, but the OBR handle will be recreated on
+   * re-add via _open()'s close-then-create pattern. After removing all
+   * elements, the element count should be 0 (the wrapper itself is retained
+   * but has no elements). */
   ret = oar_remove_audio_element(oar, 1);
   TEST_ASSERT(ret == 0, "remove element 1 failed");
 
@@ -341,15 +386,13 @@ static int test_binaural_remove_all_and_readd(void) {
  * When head_tracking is disabled, verifies that re-add produces
  * identical output (baseline for the head rotation test). */
 static int test_binaural_readd_determinism(int head_tracking) {
-  oar_config_t cfg = create_config(ck_oar_layout_binaural, 256, 48000);
+  oar_config_t cfg =
+      create_config(ck_oar_layout_binaural, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&cfg);
-  if (!oar) {
-    printf("SKIP: binaural not supported\n");
-    return TEST_PASS;
-  }
+  TEST_ASSERT(oar != NULL, "oar_create failed");
 
   int gid = oar_add_audio_group(oar);
-  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
+  TEST_SKIP_IF_NOTSUP(gid, "binaural not supported");
 
   if (head_tracking) {
     int ret = oar_enable_head_tracking(oar, 1);
@@ -380,11 +423,8 @@ static int test_binaural_readd_determinism(int head_tracking) {
   }
 
   polar_t pos = {45.0f, 0.0f, 1.0f};
-  oar_metadata_t *pos_meta = create_object_metadata(&pos, 1, 256);
-  TEST_ASSERT(pos_meta != NULL, "create_object_metadata failed");
-  ret = oar_update_audio_element_metadata(oar, 1, pos_meta);
-  free(pos_meta);
-  TEST_ASSERT(ret == 0, "set object position failed");
+  TEST_ASSERT(set_object_position(oar, 1, &pos, 256) == 0,
+              "set object position failed");
 
   /* Render — output A */
   uint32_t ch = oar_get_number_of_audio_element_channels(oar, 1);
@@ -393,6 +433,31 @@ static int test_binaural_readd_determinism(int head_tracking) {
   oar_audio_block_t out_a;
   TEST_ASSERT(render_and_capture(oar, 1, ch, &cfg, &out_a) == 0,
               "render A failed");
+
+  /* When head tracking is enabled, also render a baseline (no rotation) and
+   * assert that render A differs from it. This ensures the rotation actually
+   * has an effect — without this check, a regression that silently drops the
+   * rotation would go undetected (A and B would both be identity-rotation and
+   * still match each other). */
+  if (head_tracking) {
+    oar_audio_block_t out_c;
+    TEST_ASSERT(render_baseline_no_rotation(&cfg, &out_c) == 0,
+                "render C (baseline) failed");
+
+    uint32_t total_c = out_a.channels * out_a.samples_per_channel;
+    double diff_ac = sum_abs_diff(out_a.data, out_c.data, total_c);
+    double signal_ac = sum_abs(out_a.data, total_c);
+
+    printf("  A vs C (no rotation): diff=%.6f, signal=%.6f, ratio=%.6f\n",
+           diff_ac, signal_ac, signal_ac > 0 ? diff_ac / signal_ac : 0.0);
+
+    TEST_ASSERT(signal_ac > 0, "render A signal should be non-zero");
+    TEST_ASSERT(diff_ac / signal_ac > ROTATION_EFFECT_THRESHOLD,
+                "rotation had no effect: render A matches identity-rotation "
+                "baseline");
+
+    free(out_c.data);
+  }
 
   /* Remove all elements — OBR handle will be recreated on next add */
   ret = oar_remove_audio_element(oar, 1);
@@ -405,11 +470,8 @@ static int test_binaural_readd_determinism(int head_tracking) {
   ret = oar_add_audio_element(oar, gid, 2, &elem_cfg);
   TEST_ASSERT(ret == 0, "re-add element failed");
 
-  pos_meta = create_object_metadata(&pos, 1, 256);
-  TEST_ASSERT(pos_meta != NULL, "create_object_metadata failed (re-add)");
-  ret = oar_update_audio_element_metadata(oar, 2, pos_meta);
-  free(pos_meta);
-  TEST_ASSERT(ret == 0, "set object position failed (re-add)");
+  TEST_ASSERT(set_object_position(oar, 2, &pos, 256) == 0,
+              "set object position failed (re-add)");
 
   /* Render — output B */
   ch = oar_get_number_of_audio_element_channels(oar, 2);
@@ -422,10 +484,7 @@ static int test_binaural_readd_determinism(int head_tracking) {
   /* Compare outputs A and B */
   uint32_t total = out_a.channels * out_a.samples_per_channel;
   double diff = sum_abs_diff(out_a.data, out_b.data, total);
-
-  double signal_level = 0.0;
-  for (uint32_t i = 0; i < total; ++i)
-    signal_level += fabs((double)out_a.data[i]);
+  double signal_level = sum_abs(out_a.data, total);
 
   free(out_a.data);
   free(out_b.data);
@@ -434,12 +493,12 @@ static int test_binaural_readd_determinism(int head_tracking) {
     printf("  diff=%.6f, signal=%.6f, ratio=%.6f\n", diff, signal_level,
            signal_level > 0 ? diff / signal_level : 0.0);
     TEST_ASSERT(signal_level > 0, "signal level should be non-zero");
-    TEST_ASSERT(diff / signal_level < 0.01,
+    TEST_ASSERT(diff / signal_level < READD_MATCH_THRESHOLD,
                 "head rotation state lost: outputs differ after re-add");
   } else {
     printf("  diff=%.6f, signal=%.6f\n", diff, signal_level);
     TEST_ASSERT(signal_level > 0, "signal level should be non-zero");
-    TEST_ASSERT(diff < 1e-4,
+    TEST_ASSERT(diff < NO_TRACKING_DIFF_THRESHOLD,
                 "outputs should be identical without head tracking");
   }
 

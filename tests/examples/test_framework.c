@@ -60,7 +60,9 @@ static int run_test_in_child(test_entry_t *tests, int num_tests,
     int ret = test_fn();
     fflush(stdout);
     fflush(stderr);
-    _exit(ret);
+    /* Map TEST_PASS(0)→0, TEST_FAIL(-1)→1, TEST_SKIP(-2)→2.
+     * _exit() truncates to 8 bits, so negative values must be remapped. */
+    _exit(ret == 0 ? 0 : (ret == TEST_SKIP ? 2 : 1));
   }
 
   /* Parent: wait for the child and interpret the exit status. */
@@ -85,6 +87,9 @@ static int run_test_in_child(test_entry_t *tests, int num_tests,
     if (exit_code == 0) {
       printf("[%s] PASSED\n", name);
       return TEST_PASS;
+    } else if (exit_code == 2) {
+      printf("[%s] SKIPPED\n", name);
+      return TEST_SKIP;
     } else {
       printf("[%s] FAILED (exit %d)\n", name, exit_code);
       return TEST_FAIL;
@@ -126,6 +131,9 @@ static int run_test_in_child(test_entry_t *tests, int num_tests,
   } else if (exit_code == 0) {
     printf("[%s] PASSED\n", name);
     return TEST_PASS;
+  } else if (exit_code == 2) {
+    printf("[%s] SKIPPED\n", name);
+    return TEST_SKIP;
   } else {
     printf("[%s] FAILED/CRASHED (exit %d)\n", name, exit_code);
     return TEST_FAIL;
@@ -140,15 +148,17 @@ int run_all_tests(test_entry_t *tests, int num_tests, int argc, char *argv[]) {
   if (argc >= 3 && strcmp(argv[1], "--child") == 0) {
     int index = atoi(argv[2]);
     if (index < 0 || index >= num_tests) {
-      return 2; /* sentinel: invalid index */
+      return 3; /* sentinel: invalid index — must not collide with
+                 * exit codes 0=PASS, 1=FAIL, 2=SKIP */
     }
     int ret = tests[index].fn();
     fflush(stdout);
     fflush(stderr);
-    /* Map -1 (test failure) to exit code 1 so that -1 from _spawnl uniquely
+    /* Map TEST_PASS(0)→0, TEST_FAIL(-1)→1, TEST_SKIP(-2)→2.
+     * Exit code 1 is used for failure so that -1 from _spawnl uniquely
      * identifies a spawn failure rather than colliding with the child's own
      * failure return. */
-    return (ret != 0) ? 1 : 0;
+    return ret == 0 ? 0 : (ret == TEST_SKIP ? 2 : 1);
   }
 
   printf("========================================\n");
@@ -165,14 +175,16 @@ int run_all_tests(test_entry_t *tests, int num_tests, int argc, char *argv[]) {
   for (int i = 0; i < num_tests; i++) {
     printf("\n--- Running %s: %s ---\n", tests[i].name, tests[i].description);
     tc_results[i] = run_test_in_child(tests, num_tests, i);
-    if (tc_results[i] != 0) result = 1;
+    if (tc_results[i] == TEST_FAIL) result = 1;
   }
 
   printf("\n========================================\n");
   printf("Test Summary:\n");
   for (int i = 0; i < num_tests; i++) {
     printf("  %s (%s): %s\n", tests[i].name, tests[i].description,
-           tc_results[i] == 0 ? "PASSED" : "FAILED/CRASHED");
+           tc_results[i] == TEST_PASS   ? "PASSED"
+           : tc_results[i] == TEST_SKIP ? "SKIPPED"
+                                        : "FAILED/CRASHED");
   }
   printf("========================================\n");
 

@@ -32,6 +32,9 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+/* --- Common test constants --------------------------------------------- */
+#define TEST_SAMPLING_RATE 48000
+
 /* --- Config helpers ----------------------------------------------------- */
 
 /** Create an oar_config_t with the given target layout, samples_per_channel,
@@ -78,6 +81,12 @@ oar_audio_element_config_t create_scene_element_config(oar_hoa_t order);
 oar_metadata_t *create_object_metadata(const polar_t *positions,
                                        uint32_t num_objects, uint32_t duration);
 
+/** Set object position metadata on an element (convenience wrapper around
+ *  create_object_metadata + oar_update_audio_element_metadata + free).
+ *  @return 0 on success, -1 on failure. */
+int set_object_position(oar_t *oar, uint32_t element_id, const polar_t *pos,
+                        uint32_t duration);
+
 /* --- Output helpers ------------------------------------------------------ */
 
 /** Check whether data contains any non-zero samples (threshold 1e-9f).
@@ -99,5 +108,10 @@ int alloc_audio_block(uint32_t channels, uint32_t samples_per_channel,
  *          RENDER_CHECK_RENDER_ERR on render failure,
  *          RENDER_CHECK_SILENT on silent output. */
 int render_and_check_non_silent(oar_t *oar, oar_audio_block_t *output);
+
+/* --- Measurement helpers ------------------------------------------------- */
+
+/** Sum of absolute values of a float buffer. */
+double sum_abs(const float *data, uint32_t count);
 
 #endif /* OAR_TEST_HELPERS_H */
