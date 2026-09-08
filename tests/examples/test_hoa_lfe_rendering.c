@@ -132,7 +132,7 @@ static int test_lfe_level_sampling_rate_invariant(void) {
    * 96 kHz output rate with the old hardcoded coefficients) changes the
    * level the most. */
   const double kProbeToneHz = 200.0;
-  const double rms_48k = render_lfe_rms(48000, kProbeToneHz);
+  const double rms_48k = render_lfe_rms(TEST_SAMPLING_RATE, kProbeToneHz);
   const double rms_96k = render_lfe_rms(96000, kProbeToneHz);
   const double rms_44k = render_lfe_rms(44100, kProbeToneHz);
 
@@ -165,7 +165,7 @@ static int test_lfe_lowpass_attenuation(void) {
    * hardcoded-48k bug, the 96 kHz attenuation degraded to ~25.5 dB. */
   const double kLowToneHz = 200.0;
   const double kHighToneHz = 1000.0;
-  const uint32_t rates[3] = {44100, 48000, 96000};
+  const uint32_t rates[3] = {44100, TEST_SAMPLING_RATE, 96000};
 
   for (int i = 0; i < 3; ++i) {
     const double rms_low = render_lfe_rms(rates[i], kLowToneHz);

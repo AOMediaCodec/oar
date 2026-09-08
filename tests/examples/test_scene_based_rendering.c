@@ -49,7 +49,8 @@ static void generate_ambisonics_data(float *buffer, uint32_t samples,
 static int test_scene_based_rendering(void) {
   TEST_START("TC1: scene-based rendering (1OA → stereo)");
 
-  oar_config_t oar_cfg = create_config(ck_oar_layout_stereo, 256, 48000);
+  oar_config_t oar_cfg =
+      create_config(ck_oar_layout_stereo, 256, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&oar_cfg);
   TEST_ASSERT(oar != NULL, "oar_create failed");
 

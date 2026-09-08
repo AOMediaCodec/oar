@@ -41,14 +41,18 @@
 
 #include <stdio.h>
 
+#include "oar_base.h"
+
 /* --- Result codes ------------------------------------------------------- */
 
 #define TEST_PASS 0
 #define TEST_FAIL (-1)
+#define TEST_SKIP (-2)
 
 /* --- Test function type and entry --------------------------------------- */
 
-/** Test function signature: returns TEST_PASS (0) or TEST_FAIL (-1). */
+/** Test function signature: returns TEST_PASS (0), TEST_FAIL (-1), or
+ *  TEST_SKIP (-2). */
 typedef int (*test_fn_t)(void);
 
 /** A single test case in a test table. */
@@ -86,6 +90,24 @@ typedef struct {
 /** Assert actual != unexpected. */
 #define TEST_ASSERT_NE(actual, unexpected, msg) \
   TEST_ASSERT((actual) != (unexpected), msg)
+
+/** Skip the test when @p ret is exactly ck_oar_error_notsup: the optional
+ *  feature under test (e.g. the binaural renderer) is not built in. Any other
+ *  negative value is a real error and fails the test (printing the actual
+ *  error code) instead of skipping it. @p ret is evaluated exactly once. */
+#define TEST_SKIP_IF_NOTSUP(ret, msg)                                        \
+  do {                                                                       \
+    const int test_skip_ret_ = (ret);                                        \
+    if (test_skip_ret_ == ck_oar_error_notsup) {                             \
+      printf("SKIP: %s (not supported)\n", (msg));                           \
+      return TEST_SKIP;                                                      \
+    }                                                                        \
+    if (test_skip_ret_ < 0) {                                                \
+      fprintf(stderr, "FAIL: %s (ret=%d, line %d)\n", (msg), test_skip_ret_, \
+              __LINE__);                                                     \
+      return TEST_FAIL;                                                      \
+    }                                                                        \
+  } while (0)
 
 /* --- Visual helpers (optional) ----------------------------------------- */
 
