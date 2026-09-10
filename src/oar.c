@@ -519,8 +519,7 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
   out_channels = oar_get_number_of_output_channels(oar);
   samples = oar->config.samples_per_channel;
 
-  if (output->channels != out_channels ||
-      output->samples_per_channel != samples)
+  if (output->channels != out_channels || output->samples_per_channel < samples)
     return ck_oar_error_inval;
 
   group_count = vector_size(oar->groups);
@@ -554,13 +553,16 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
     return ck_oar_error_nomem;
   }
 
+  int any_data = 0;
+
   for (i = 0; i < group_count; i++) {
     audio_group_t *group = def_value_wrap_ptr(vector_at(oar->groups, i));
 
     n = vector_size(group->renderers);
     for (j = 0; j < n; j++) {
       renderer = def_value_wrap_ptr(vector_at(group->renderers, j));
-      if (!renderer->block.data) continue;
+      if (!renderer->has_data) continue;
+      any_data = 1;
 
       if (renderer->ctx.out == ck_rio_id_binaural)
         renderer->impl->apply_gains(renderer, 0);
@@ -585,12 +587,17 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
   // Free the temporary renderer output block
   def_free(renderer_output.data);
 
+  if (!any_data) goto cleanup;
+
   memset(output->data, 0, sizeof(float) * out_channels * samples);
   for (i = 0; i < group_count; i++) {
     for (uint32_t k = 0; k < out_channels * samples; k++) {
       output->data[k] += group_blocks[i].data[k];
     }
   }
+
+  if (output->samples_per_channel != samples)
+    output->samples_per_channel = samples;
 
 #ifdef __as_dbg__
   if (oar->mixed)
@@ -600,14 +607,14 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
   if (oar->limiter) oar_limiter_process(oar->limiter, output);
 
   /* Elapse metadata based on input frame count, not limiter output */
-
   _oar_metadatas_elapse(oar, samples);
 
+cleanup:
   for (i = 0; i < group_count; i++)
     if (group_blocks[i].data) def_free(group_blocks[i].data);
   def_free(group_blocks);
 
-  return ck_oar_ok;
+  return any_data ? ck_oar_ok : ck_oar_error_inval;
 }
 
 int oar_flush(oar_t *oar, oar_audio_block_t *output) {
@@ -645,6 +652,7 @@ int oar_set_loudness(oar_t *oar, uint32_t gid, float loudness,
 
 int oar_enable_limiter(oar_t *oar, int enable) {
   if (!oar) return ck_oar_error_inval;
+  if (!oar->limiter) return ck_oar_error_notsup;
   return oar_limiter_enable(oar->limiter, enable);
 }
 
@@ -732,6 +740,7 @@ uint32_t oar_get_number_of_audio_elements(oar_t *oar) {
 
 int oar_set_limiter_threshold(oar_t *oar, float threshold_db) {
   if (!oar) return ck_oar_error_inval;
+  if (!oar->limiter) return ck_oar_error_notsup;
   return oar_limiter_set_threshold(oar->limiter, threshold_db);
 }
 

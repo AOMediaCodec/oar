@@ -330,6 +330,8 @@ int audio_element_renderer_update_data(audio_renderer_base_t *base, uint32_t id,
   memcpy(self->base.block.data, block->data,
          block->channels * block->samples_per_channel * sizeof(float));
 
+  self->base.has_data = 1;
+
 #ifdef __as_dbg__
   // Write original audio data to debug WAV file if available
   if (self->element.original) {
@@ -370,6 +372,8 @@ int audio_element_renderer_render(audio_renderer_base_t *base,
            self->base.block.channels * self->base.block.samples_per_channel *
                sizeof(float));
   }
+
+  self->base.has_data = 0;
 
   return ret;
 }

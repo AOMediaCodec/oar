@@ -151,7 +151,6 @@ static inline float find_peak(audio_effect_peak_limiter_t* ths, int idx) {
         ths->peak_pos = wrapped;
       }
     }
-    if (ths->peak_pos < 0) ths->peak_pos = wrap_index(idx, ths->delay_size);
   } else {
     peak = ths->peak_data[ths->peak_pos];
   }
@@ -226,17 +225,13 @@ static inline float update_gain_envelope(audio_effect_peak_limiter_t* ths) {
  * started. If a transition is already in progress, it is overridden:
  * target_start_gain is set to current_gain to preserve the current state,
  * and the time counter is reset to 0 (re-enters attack phase).
- *
- * @return 1 if new transition started, 0 otherwise
  */
-static inline int detect_peak(audio_effect_peak_limiter_t* ths, float peak) {
+static inline void detect_peak(audio_effect_peak_limiter_t* ths, float peak) {
   if (peak * ths->current_gain > ths->linear_threshold) {
     ths->target_start_gain = ths->current_gain;
     ths->target_end_gain = ths->linear_threshold / peak;
     ths->current_tc = 0.0f;
-    return 1;
   }
-  return 0;
 }
 
 /**
@@ -285,30 +280,23 @@ static float process_channels(audio_effect_peak_limiter_t* ths,
 }
 
 /**
- * @brief Compact planar output data to remove look-ahead delay padding.
- * Uses pad_size to track remaining padding (0 = no padding / completed).
- * @return Number of valid output samples (frame_size - pad_size)
+ * @brief Advance priming counter for emit-priming mode.
+ *
+ * During priming, process_channels already outputs zeros (delay buffer
+ * is zero-initialized by reset_state). No data movement needed —
+ * just decrement pad_size to track how many priming samples remain.
+ *
+ * Contrast with compact_output (drop-priming), which memmoved valid
+ * data forward and returned a variable count. advance_priming always
+ * returns frame_size.
+ *
+ * @return Always frame_size (output length never changes)
  */
-static int compact_output(audio_effect_peak_limiter_t* ths, float* outblock,
-                          int frame_size) {
-  /* Case 1: Entire frame is padding */
-  if (ths->pad_size >= frame_size) {
-    ths->pad_size -= frame_size;
-    return 0;
-  }
-
-  /* Case 2: Partial padding — remove and mark done */
+static int advance_priming(audio_effect_peak_limiter_t* ths, int frame_size) {
   if (ths->pad_size > 0) {
-    int valid = frame_size - ths->pad_size;
-    for (int c = 0; c < ths->num_channels; c++) {
-      memmove(&outblock[c * valid], &outblock[c * frame_size + ths->pad_size],
-              valid * sizeof(float));
-    }
-    ths->pad_size = 0;
-    return valid;
+    ths->pad_size =
+        (ths->pad_size >= frame_size) ? ths->pad_size - frame_size : 0;
   }
-
-  /* Case 3: No padding (pad_size == 0) — nothing to do */
   return frame_size;
 }
 
@@ -361,7 +349,7 @@ static int process_core(audio_effect_peak_limiter_t* ths, const float* inblock,
         wrap_index(ths->entry_index + frame_size, ths->delay_size);
   }
 
-  return compact_output(ths, outblock, frame_size);
+  return advance_priming(ths, frame_size);
 }
 
 audio_effect_peak_limiter_t* audio_effect_peak_limiter_create(
@@ -410,7 +398,6 @@ audio_effect_peak_limiter_t* audio_effect_peak_limiter_create(
   /* threshold setting delegated to set_threshold (reuses clampf + powf) */
   audio_effect_peak_limiter_set_threshold(ths, threshold_db);
   ths->attack_sec = atk_sec;
-
   ths->release_sec = rel_sec;
   ths->inc_tc = 1.0f / (float)sample_rate;
   ths->num_channels = num_channels;
