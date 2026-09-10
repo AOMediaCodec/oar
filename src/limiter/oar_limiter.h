@@ -10,59 +10,110 @@
  * www.aomedia.org/license/patent.
  */
 
+#ifndef __OAR_LIMITER_H__
+#define __OAR_LIMITER_H__
 
-/*
- * Copyright (c) 2025 Google LLC
- *
- * This source code is subject to the terms of the BSD 3-Clause Clear License,
- * which you can find in the LICENSE file, and the Open Binaural Renderer
- * Patent License 1.0, which you can find in the PATENTS file.
- */
+#include <stdint.h>
 
-#ifndef _OAR_LIMITER_H_
-#define _OAR_LIMITER_H_
-
-#include "oar_base.h"  // For oar_audio_block_t
+#include "oar_base.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*!\brief Struct for oar_limiter_t state. */
-typedef struct OarLimiter {
-  int sampling_rate;
-  double ceiling;
-  double release_time_constant;
-  double env;
-} oar_limiter_t;
+/* Opaque pointer: the internal structure is defined in the .c file to
+ * prevent external code from directly accessing or modifying limiter state. */
+typedef struct OarLimiter oar_limiter_t;
 
-/*!\brief Constructor for oar_limiter_t.
- *
- * \param sampling_rate Sampling rate of the audio data.
- * \param release_ms Release time in milliseconds.
- * \param ceiling_db Ceiling level in decibels.
- * \return A pointer to the newly created oar_limiter_t instance, or NULL on
- * failure.
- */
-oar_limiter_t* oar_limiter_create(int sampling_rate, double release_ms,
-                                  double ceiling_db);
+typedef struct oar_limiter_config {
+  int sample_rate;
+  int num_channels;
+  int samples_per_channel;
+  float threshold_db;
+  float attack_sec;
+  float release_sec;
+  float look_ahead_sec;
+} oar_limiter_config_t;
 
-/*!\brief Destructor for oar_limiter_t.
- *
- * \param limiter Pointer to the oar_limiter_t instance to destroy.
+/**
+ * @brief     Create and initialize an OAR limiter instance.
+ *            Internally creates audio_effect_peak_limiter_t and allocates
+ *            the intermediate output buffer.
+ * @param     [in] config : Limiter configuration
+ * @return    Handle on success, NULL on failure
  */
-void oar_limiter_destroy(oar_limiter_t* limiter);
+oar_limiter_t *oar_limiter_create(const oar_limiter_config_t *config);
 
-/*!\brief Processes the input audio buffer and applies peak limiting.
- *
- * \param limiter Pointer to the oar_limiter_t instance.
- * \param Audio block to be processed.
- * \return Zero on success, non-zero on failure.
+/**
+ * @brief     Destroy the OAR limiter instance and free all resources.
+ *            NULL-safe: passing NULL is a no-op.
+ * @param     [in] limiter : OAR limiter handle
  */
-int oar_limiter_process(oar_limiter_t* limiter, oar_audio_block_t* block);
+void oar_limiter_destroy(oar_limiter_t *limiter);
+
+/**
+ * @brief     Enable or disable the limiter.
+ *            When re-enabling (disabled -> enabled), internal state is reset
+ *            via flush(NULL) to discard stale delay buffer data.
+ * @param     [in] limiter : OAR limiter handle
+ * @param     [in] enable  : 1 to enable, 0 to disable
+ * @return    ck_oar_ok on success, ck_oar_error_inval on invalid parameters
+ */
+int oar_limiter_enable(oar_limiter_t *limiter, int enable);
+
+/**
+ * @brief     Process audio through the limiter.
+ *            When enabled: applies peak limiting, updates samples_per_channel.
+ *            When disabled or peak_limiter is NULL: passthrough (no
+ *            modification to output).
+ * @param     [in]     limiter : OAR limiter handle
+ * @param     [in,out] output  : Audio block (planar float). On return,
+ *                               samples_per_channel may be reduced (look-ahead
+ *                               delay padding in first frames).
+ * @return    ck_oar_ok on success, ck_oar_error_inval on invalid parameters
+ */
+int oar_limiter_process(oar_limiter_t *limiter, oar_audio_block_t *output);
+
+/**
+ * @brief     Flush remaining samples from the limiter's delay buffer.
+ *            After flush, limiter state is reset to initial state.
+ *            Subsequent oar_limiter_process() calls work normally.
+ * @param     [in]     limiter : OAR limiter handle
+ * @param     [in,out] output  : Audio block to receive flushed samples.
+ *                               samples_per_channel is set to flushed count.
+ *                               output->data must be allocated for at least
+ *                               max(samples_per_channel, delay_size) *
+ *                               channels floats.
+ * @return    ck_oar_ok on success, ck_oar_error_inval on invalid parameters.
+ *            On success, output->samples_per_channel is set to the number of
+ *            flushed samples (may be 0 if limiter is disabled or no delay).
+ */
+int oar_limiter_flush(oar_limiter_t *limiter, oar_audio_block_t *output);
+
+/**
+ * @brief     Set the limiter threshold dynamically (O(1), no state reset).
+ *            The threshold_db value is clamped to [-60, 0] by the underlying
+ *            implementation. Out-of-range values are silently clamped.
+ * @param     [in] limiter      : OAR limiter handle
+ * @param     [in] threshold_db : New threshold in dB [-60, 0]
+ * @return    ck_oar_ok on success, ck_oar_error_inval on invalid parameters
+ */
+int oar_limiter_set_threshold(oar_limiter_t *limiter, float threshold_db);
+
+/**
+ * @brief     Get the limiter look-ahead delay in samples.
+ * @param     [in] limiter : OAR limiter handle
+ * @return    Delay in samples, 0 if invalid
+ */
+int oar_limiter_get_delay(const oar_limiter_t *limiter);
+
+/*
+ * @note This module is NOT thread-safe. The caller must ensure that
+ *       the same handle is not accessed concurrently from multiple threads.
+ */
 
 #ifdef __cplusplus
-}  // extern "C"
+}
 #endif
 
-#endif  // _OAR_LIMITER_H_
+#endif /* __OAR_LIMITER_H__ */
