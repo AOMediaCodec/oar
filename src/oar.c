@@ -38,8 +38,10 @@
 #include "renderer/obr/obr.h"
 #endif
 
-#define def_limiter_release_ms 50
-#define def_limiter_threshold_dbfs -1.f
+#define def_limiter_attack_sec 0.001f
+#define def_limiter_release_sec 0.200f
+#define def_limiter_look_ahead_sec 0.005f
+#define def_limiter_threshold_dbfs -1.0f
 #define def_max_audio_group_id 2
 #define def_default_metadata_samples 1
 
@@ -55,7 +57,6 @@ struct Oar {
   vector_t *groups;  // vector<audio_group_t>
   renderer_library_manager_t renderer_library_manager;
   int enable_loudness_processor;
-  int enable_limiter;
   head_tracking_t enable_head_tracking;
   quaternion_t head_rotation;
   oar_limiter_t *limiter;
@@ -152,15 +153,24 @@ oar_t *oar_create(const oar_config_t *config) {
     info("renderer[%d] id:%s", i, impl->id);
   }
 
-  oar->limiter =
-      oar_limiter_create(config->sampling_rate, def_limiter_release_ms,
-                         def_limiter_threshold_dbfs);
+  /* Create limiter via oar_limiter_t orchestration layer */
+  oar_limiter_config_t limiter_config = {
+      .sample_rate = (int)config->sampling_rate,
+      .num_channels = (int)layout_channels_count(config->target_layout),
+      .samples_per_channel = (int)config->samples_per_channel,
+      .threshold_db = def_limiter_threshold_dbfs,
+      .attack_sec = def_limiter_attack_sec,
+      .release_sec = def_limiter_release_sec,
+      .look_ahead_sec = def_limiter_look_ahead_sec,
+  };
+  oar->limiter = oar_limiter_create(&limiter_config);
   if (!oar->limiter) {
-    oar_destroy(oar);
-    return 0;
+    warning("Failed to create limiter");
+    /* Continue without limiter - don't fail OAR creation */
   }
 
   oar->metadata_samples[ck_metadata_gain] = def_default_metadata_samples;
+
   oar->metadata_samples[ck_metadata_object_positions] =
       config->samples_per_channel;
 
@@ -181,7 +191,7 @@ void oar_destroy(oar_t *oar) {
     if (oar->groups)
       vector_free(oar->groups, def_default_free_ptr(_audio_group_delete));
     renderer_library_manager_clear(&oar->renderer_library_manager);
-    if (oar->limiter) oar_limiter_destroy(oar->limiter);
+    oar_limiter_destroy(oar->limiter);
 
 #ifdef __as_dbg__
     if (oar->mixed) wav_writer_close(oar->mixed);
@@ -587,15 +597,26 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
     wav_writer_write(oar->mixed, output->data, samples, out_channels);
 #endif
 
-  if (oar->enable_limiter) oar_limiter_process(oar->limiter, output);
+  if (oar->limiter) oar_limiter_process(oar->limiter, output);
 
-  _oar_metadatas_elapse(oar, output->samples_per_channel);
+  /* Elapse metadata based on input frame count, not limiter output */
+
+  _oar_metadatas_elapse(oar, samples);
 
   for (i = 0; i < group_count; i++)
     if (group_blocks[i].data) def_free(group_blocks[i].data);
   def_free(group_blocks);
 
   return ck_oar_ok;
+}
+
+int oar_flush(oar_t *oar, oar_audio_block_t *output) {
+  if (!oar || !output || !output->data) return ck_oar_error_inval;
+  if (!oar->limiter) {
+    output->samples_per_channel = 0;
+    return ck_oar_ok;
+  }
+  return oar_limiter_flush(oar->limiter, output);
 }
 
 int oar_enable_loudness_processor(oar_t *oar, int enable) {
@@ -624,8 +645,7 @@ int oar_set_loudness(oar_t *oar, uint32_t gid, float loudness,
 
 int oar_enable_limiter(oar_t *oar, int enable) {
   if (!oar) return ck_oar_error_inval;
-  oar->enable_limiter = enable ? 1 : 0;
-  return ck_oar_ok;
+  return oar_limiter_enable(oar->limiter, enable);
 }
 
 int oar_enable_head_tracking(oar_t *oar, int enable) {
@@ -708,4 +728,14 @@ uint32_t oar_get_number_of_audio_elements(oar_t *oar) {
   }
 
   return total_count;
+}
+
+int oar_set_limiter_threshold(oar_t *oar, float threshold_db) {
+  if (!oar) return ck_oar_error_inval;
+  return oar_limiter_set_threshold(oar->limiter, threshold_db);
+}
+
+int oar_get_limiter_delay(oar_t *oar) {
+  if (!oar) return 0;
+  return oar_limiter_get_delay(oar->limiter);
 }

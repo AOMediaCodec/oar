@@ -81,6 +81,7 @@ set(OAR_SRC
     src/renderer/olr/object_audio_renderer/block_processor/processing_block.c
     src/renderer/olr/object_audio_renderer/renderer.c
     src/renderer/olr/olr.c
+    src/limiter/audio_effect_peak_limiter.c
     src/limiter/oar_limiter.c
     src/oar.c
     src/oar_utils.c
