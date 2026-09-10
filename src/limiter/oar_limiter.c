@@ -97,22 +97,20 @@ int oar_limiter_process(oar_limiter_t *lim, oar_audio_block_t *output) {
 
   int samples = (int)output->samples_per_channel;
 
-  /* Process through peak limiter: output->data -> out_buf */
+  /* Process: output->data -> out_buf (emit-priming: returned == samples) */
   int returned = audio_effect_peak_limiter_process_block(
       lim->peak_limiter, output->data, lim->out_buf, samples);
 
   if (returned < 0) {
     warning("Limiter process error: %d", returned);
-    output->samples_per_channel = 0;
     return ck_oar_error_inval;
-  } else if (returned > 0) {
-    for (int c = 0; c < lim->num_channels; c++) {
-      memcpy(&output->data[c * returned], &lim->out_buf[c * returned],
-             returned * sizeof(float));
-    }
   }
 
-  output->samples_per_channel = (uint32_t)returned;
+  for (int c = 0; c < lim->num_channels; c++) {
+    memcpy(&output->data[c * samples], &lim->out_buf[c * samples],
+           samples * sizeof(float));
+  }
+
   return ck_oar_ok;
 }
 

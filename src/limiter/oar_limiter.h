@@ -63,13 +63,15 @@ int oar_limiter_enable(oar_limiter_t *limiter, int enable);
 
 /**
  * @brief     Process audio through the limiter.
- *            When enabled: applies peak limiting, updates samples_per_channel.
+ *            When enabled: applies peak limiting (emit-priming mode,
+ *            output length is always equal to input samples_per_channel).
  *            When disabled or peak_limiter is NULL: passthrough (no
  *            modification to output).
  * @param     [in]     limiter : OAR limiter handle
- * @param     [in,out] output  : Audio block (planar float). On return,
- *                               samples_per_channel may be reduced (look-ahead
- *                               delay padding in first frames).
+ * @param     [in,out] output  : Audio block (planar float). Output length
+ *                               is always equal to input samples_per_channel.
+ *                               First delay_size samples are zero-padded
+ *                               (priming) when limiter is freshly enabled.
  * @return    ck_oar_ok on success, ck_oar_error_inval on invalid parameters
  */
 int oar_limiter_process(oar_limiter_t *limiter, oar_audio_block_t *output);
