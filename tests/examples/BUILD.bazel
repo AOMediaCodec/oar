@@ -80,3 +80,11 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_peak_limiter_oar_api",
+    srcs = ["test_peak_limiter_oar_api.c"],
+    deps = [
+        ":oar_test_common",
+    ],
+)
+

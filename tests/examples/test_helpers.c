@@ -36,6 +36,20 @@ void generate_sine(float *buffer, uint32_t samples, float freq, float rate) {
   }
 }
 
+void generate_sine_ampl(float *buffer, uint32_t samples, float freq, float rate,
+                        float amplitude) {
+  for (uint32_t i = 0; i < samples; ++i) {
+    buffer[i] = amplitude * (float)sin(2.0 * M_PI * freq * ((float)i / rate));
+  }
+}
+
+float amplitude_over_threshold(float threshold_db, float render_gain,
+                               float margin_db) {
+  float linear_threshold = powf(10.0f, threshold_db / 20.0f);
+  float target_output_peak = linear_threshold * powf(10.0f, margin_db / 20.0f);
+  return target_output_peak / render_gain;
+}
+
 void generate_sine_channel(float *buffer, uint32_t samples, uint32_t channels,
                            uint32_t ch_idx, float freq, float rate) {
   if (ch_idx >= channels) return; /* boundary check */
@@ -124,11 +138,23 @@ int set_object_position(oar_t *oar, uint32_t element_id, const polar_t *pos,
 
 /* --- Output helpers ------------------------------------------------------ */
 
-int is_output_non_silent(const float *data, uint32_t count) {
+int is_all_zero(const float *data, uint32_t count) {
   for (uint32_t i = 0; i < count; ++i) {
-    if (fabsf(data[i]) > 1e-9f) return 1;
+    if (fabsf(data[i]) > 1e-9f) return 0;
   }
-  return 0;
+  return 1;
+}
+
+int is_output_non_silent(const float *data, uint32_t count) {
+  return !is_all_zero(data, count);
+}
+
+int check_output_limited(const oar_audio_block_t *out, float linear_threshold) {
+  uint32_t total = out->channels * out->samples_per_channel;
+  for (uint32_t i = 0; i < total; ++i) {
+    if (fabsf(out->data[i]) > linear_threshold + 1e-6f) return 0;
+  }
+  return 1;
 }
 
 int alloc_audio_block(uint32_t channels, uint32_t samples_per_channel,
