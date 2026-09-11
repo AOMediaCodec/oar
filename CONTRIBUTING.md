@@ -42,19 +42,11 @@ clang-format -i --style=file \
   cmake --build build
   ```
 
-- Run the example programs as smoke tests and ensure they pass:
+- Run the example tests (label `oar`) and the obr unit tests (label `obr`)
+  and ensure they pass:
 
   ```sh
-  ./build/tests/examples/test_audio_element_types
-  ./build/tests/examples/test_channel_based_rendering
-  ./build/tests/examples/test_scene_based_rendering
-  ./build/tests/examples/test_object_based_rendering
-  ```
-
-- Run the obr unit tests and ensure they pass:
-
-  ```sh
-  ctest --test-dir build/src/renderer/obr/obr_capi/obr -L obr --output-on-failure
+  ctest --test-dir build -L 'oar|obr' --output-on-failure
   ```
 
 - Submit a pull request for review by the maintainers.
