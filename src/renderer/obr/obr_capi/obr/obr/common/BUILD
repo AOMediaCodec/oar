@@ -6,6 +6,7 @@ cc_library(
     name = "common",
     hdrs = [
         "ambisonic_utils.h",
+        "atomic_rotation.h",
         "constants.h",
         "misc_math.h",
         "status_macros.h",

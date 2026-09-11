@@ -13,6 +13,7 @@
 #ifndef OBR_RENDERER_OBR_IMPL_H_
 #define OBR_RENDERER_OBR_IMPL_H_
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -21,6 +22,7 @@
 #include "absl/status/status.h"
 #include "absl/synchronization/mutex.h"
 #include "obr/ambisonic_binaural_decoder/fft_manager.h"
+#include "obr/common/atomic_rotation.h"
 #include "obr/ambisonic_binaural_decoder/resampler.h"
 #include "obr/audio_buffer/audio_buffer.h"
 #include "obr/common/misc_math.h"
@@ -234,11 +236,29 @@ class ObrImpl {
   const int buffer_size_per_channel_;
   const int sampling_rate_;
 
-  bool head_tracking_enabled_;
-  bool limiter_enabled_;
-  WorldRotation world_rotation_;
+  // Continuous control state, published without a lock and latched by
+  // `Process()` at the start of each block.
+  //
+  // These are written from whichever thread drives head tracking while
+  // `Process()` reads them on the audio thread. They are values rather than
+  // shared structures, so they do not need `mutex_` -- and must not use it,
+  // because taking a lock the control thread can hold would let a preempted
+  // control thread stall audio. Latching them once per block also means a
+  // rotation applies to a whole buffer instead of changing partway through it,
+  // which is what the rotation interpolation in `ProcessingGroup` assumes.
+  std::atomic<bool> head_tracking_enabled_;
+  std::atomic<bool> limiter_enabled_;
+  AtomicWorldRotation world_rotation_;
 
-  // Mutex to protect data accessed in different threads.
+  // Last rotation `Process()` read, owned by the audio thread. Used as the
+  // fallback when a rotation update is mid-flight, so the read never waits.
+  WorldRotation last_world_rotation_;
+
+  // Mutex to protect structural state -- the audio element and processing
+  // group collections -- which is rebuilt by configuration calls and read
+  // while rendering. Unlike the control state above this guards containers
+  // whose contents are being created and destroyed, so it stays a mutex. It
+  // is not taken by anything that runs continuously during playback.
   mutable absl::Mutex mutex_;
 
   std::vector<AudioElementConfig> audio_elements_;

@@ -12,7 +12,10 @@
 
 #include "obr/renderer/obr_impl.h"
 
+#include <atomic>
+#include <cmath>
 #include <cstddef>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1072,6 +1075,52 @@ TEST(ObrImplTest, TestPassthroughOnlyAppliesPeakLimiter) {
   // The limiter ceiling is -0.5dB (~0.944). Allow some margin.
   EXPECT_LT(peak_left, 1.1f);
   EXPECT_LT(peak_right, 1.1f);
+}
+
+// Head rotation is written from a sensor or control thread while `Process()`
+// renders on the audio thread. This is the access pattern that made the
+// unsynchronized quaternion write a data race; run it under ThreadSanitizer
+// to check the handoff is clean.
+//
+// It also asserts what the audio thread must never do: `Process()` takes no
+// lock that these setters hold, so it cannot be blocked by them.
+TEST(ObrImplTest, TestConcurrentHeadRotationDuringProcessing) {
+  ObrImpl renderer(kBufferSizePerChannel, kSamplingRate);
+  EXPECT_THAT(renderer.AddAudioElement(AudioElementType::k3OA), IsOk());
+  renderer.EnableHeadTracking(true);
+
+  AudioBuffer input_buffer(16, kBufferSizePerChannel);
+  AudioBuffer output_buffer(2, kBufferSizePerChannel);
+  input_buffer[0][0] = 1.0f;
+
+  std::atomic<bool> stop{false};
+  std::thread control([&renderer, &stop]() {
+    int step = 0;
+    while (!stop.load(std::memory_order_relaxed)) {
+      // Sweep yaw so successive quaternions differ in every component.
+      const float angle = static_cast<float>(step % 360) * 0.0087266f;
+      EXPECT_THAT(renderer.SetHeadRotation(std::cos(angle), 0.0f,
+                                           std::sin(angle), 0.0f),
+                  IsOk());
+      renderer.EnableHeadTracking((step & 1) == 0);
+      renderer.EnableLimiter((step & 2) == 0);
+      ++step;
+    }
+  });
+
+  for (int block = 0; block < 200; ++block) {
+    renderer.Process(input_buffer, &output_buffer);
+  }
+
+  stop.store(true, std::memory_order_relaxed);
+  control.join();
+
+  // Whatever rotations landed, rendering must have stayed finite.
+  for (size_t channel = 0; channel < output_buffer.num_channels(); ++channel) {
+    for (size_t frame = 0; frame < output_buffer.num_frames(); ++frame) {
+      EXPECT_TRUE(std::isfinite(output_buffer[channel][frame]));
+    }
+  }
 }
 
 }  // namespace
