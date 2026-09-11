@@ -27,6 +27,7 @@ oar_add_test(test_scene_based_rendering)
 oar_add_test(test_object_based_rendering)
 oar_add_test(test_metadata_unit_processing)
 oar_add_test(test_remove_audio_element)
+oar_add_test(test_peak_limiter_oar_api)
 
 # The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
 # into the library when OAR_ENABLE_HOA_LFE is ON.

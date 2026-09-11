@@ -47,6 +47,25 @@ oar_config_t create_config(oar_layout_t layout, uint32_t samples_per_channel,
 /** Write a sine wave into buffer[0..samples-1] (single channel). */
 void generate_sine(float *buffer, uint32_t samples, float freq, float rate);
 
+/** Write a sine wave with specified peak amplitude into buffer[0..samples-1].
+ *  @param amplitude Peak amplitude (e.g. 2.0 for signal above full-scale). */
+void generate_sine_ampl(float *buffer, uint32_t samples, float freq, float rate,
+                        float amplitude);
+
+/** Compute the input amplitude such that the rendered output peak exceeds
+ *  the limiter threshold by margin_db.
+ *
+ *  Computes: input_amplitude = linear_threshold × 10^(margin_db/20) /
+ * render_gain so that after rendering: input_amplitude × render_gain >
+ * linear_threshold.
+ *
+ *  @param threshold_db  Limiter threshold in dB (e.g. -1.0)
+ *  @param render_gain    Expected per-channel rendering gain (e.g. 0.707)
+ *  @param margin_db      Safety margin above threshold in dB (e.g. 6.0)
+ */
+float amplitude_over_threshold(float threshold_db, float render_gain,
+                               float margin_db);
+
 /** Write a sine wave into one channel of a planar multi-channel buffer.
  *  Writes to buffer[ch_idx * samples .. (ch_idx + 1) * samples - 1]. */
 void generate_sine_channel(float *buffer, uint32_t samples, uint32_t channels,
@@ -92,6 +111,15 @@ int set_object_position(oar_t *oar, uint32_t element_id, const polar_t *pos,
 /** Check whether data contains any non-zero samples (threshold 1e-9f).
  *  @return 1 if non-silent, 0 if silent. */
 int is_output_non_silent(const float *data, uint32_t count);
+
+/** Check whether all samples are zero (threshold 1e-9f).
+ *  @return 1 if all zero, 0 if any non-zero sample. */
+int is_all_zero(const float *data, uint32_t count);
+
+/** Check all samples in an audio block stay within +/-linear_threshold
+ *  (small epsilon for float rounding).
+ *  @return 1 if limited, 0 if any sample exceeds the threshold. */
+int check_output_limited(const oar_audio_block_t *out, float linear_threshold);
 
 /** Allocate a zero-initialised audio block (channels, samples_per_channel,
  *  and data buffer all set). Caller must free output->data.
