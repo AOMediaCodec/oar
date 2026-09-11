@@ -43,12 +43,12 @@ oar_limiter_t *oar_limiter_create(const oar_limiter_config_t *config) {
 
   lim->num_channels = config->num_channels;
   lim->samples_per_channel = config->samples_per_channel;
-  lim->delay_size = (int)(config->look_ahead_sec * config->sample_rate);
 
   /* Create underlying peak limiter */
   lim->peak_limiter = audio_effect_peak_limiter_create(
       config->threshold_db, config->sample_rate, config->num_channels,
-      config->attack_sec, config->release_sec, lim->delay_size);
+      config->attack_sec, config->release_sec,
+      (config->look_ahead_sec * config->sample_rate));
   if (!lim->peak_limiter) {
     warning("Failed to create peak limiter");
     def_free(lim);
