@@ -11,12 +11,16 @@ if(NOT MSVC)
 endif()
 
 # --- Helper function -------------------------------------------------------
-# Creates a test executable, links it, and registers it with CTest.
+# Creates a test executable, links it, and registers it with CTest under the
+# "oar" label (mirroring the "obr" label in the obr subtree), so
+# `ctest -L 'oar|obr'` selects the project's tests and skips the ones that
+# FetchContent'd dependencies (Eigen) register but never build.
 function(oar_add_test name)
   add_executable(${name} ${name}.c)
   target_link_libraries(${name} PRIVATE oar_test_common)
   set_property(TARGET ${name} PROPERTY C_STANDARD 99)
   add_test(NAME ${name} COMMAND ${name})
+  set_tests_properties(${name} PROPERTIES LABELS oar)
 endfunction()
 
 # --- Test targets ---------------------------------------------------------

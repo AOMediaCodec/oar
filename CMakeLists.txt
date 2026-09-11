@@ -7,6 +7,12 @@ project(${PROJECT_N} VERSION 1.0.0)
 # generated for the examples to link against.
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
+# Register tests from every subtree (obr unit tests, liboar examples) so a
+# single `ctest --test-dir build` covers them all. This has to precede the
+# first add_subdirectory(): CTest only writes the per-directory test files
+# for directories added after testing is enabled.
+enable_testing()
+
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED True)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
@@ -123,7 +129,6 @@ endif()
 install(DIRECTORY include/ DESTINATION include/oar)
 
 if(OAR_BUILD_EXAMPLES)
-    enable_testing()
     add_subdirectory(tests/examples)
 endif()
 
