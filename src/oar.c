@@ -587,17 +587,18 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
   // Free the temporary renderer output block
   def_free(renderer_output.data);
 
+  memset(output->data, 0, sizeof(float) * out_channels * samples);
+
+  if (output->samples_per_channel != samples)
+    output->samples_per_channel = samples;
+
   if (!any_data) goto cleanup;
 
-  memset(output->data, 0, sizeof(float) * out_channels * samples);
   for (i = 0; i < group_count; i++) {
     for (uint32_t k = 0; k < out_channels * samples; k++) {
       output->data[k] += group_blocks[i].data[k];
     }
   }
-
-  if (output->samples_per_channel != samples)
-    output->samples_per_channel = samples;
 
 #ifdef __as_dbg__
   if (oar->mixed)
