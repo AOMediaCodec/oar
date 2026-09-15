@@ -10,88 +10,143 @@
  * www.aomedia.org/license/patent.
  */
 
-
 #include "oar_limiter.h"
 
-#include <math.h>
-#include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "audio_effect_peak_limiter.h"
+#include "clog.h"
 #include "definitions.h"
-#include "oar_base.h"
 
-oar_limiter_t* oar_limiter_create(int sampling_rate, double release_ms,
-                                  double ceiling_db) {
-  if (sampling_rate <= 0 || release_ms <= 0) return 0;
+struct OarLimiter {
+  /* --- Configuration (fixed after create) --- */
+  int num_channels;
+  int samples_per_channel;
+  int delay_size;
 
-  oar_limiter_t* limiter = def_mallocz(oar_limiter_t, 1);
-  if (!limiter) return 0;
+  /* --- State --- */
+  int enabled;
 
-  limiter->sampling_rate = sampling_rate;
-  limiter->ceiling = pow(10.0, ceiling_db / 20.0);
-  limiter->release_time_constant =
-      exp(-3.0 / (limiter->sampling_rate * release_ms / 1000.0));
-  limiter->env = 1.0;
+  /* --- Internal resources --- */
+  audio_effect_peak_limiter_t *peak_limiter;
+  float *out_buf;
+};
 
-  return limiter;
+oar_limiter_t *oar_limiter_create(const oar_limiter_config_t *config) {
+  if (!config || config->sample_rate <= 0 || config->num_channels <= 0 ||
+      config->samples_per_channel <= 0)
+    return NULL;
+
+  oar_limiter_t *lim = def_mallocz(oar_limiter_t, 1);
+  if (!lim) return NULL;
+
+  lim->num_channels = config->num_channels;
+  lim->samples_per_channel = config->samples_per_channel;
+
+  /* Create underlying peak limiter */
+  lim->peak_limiter = audio_effect_peak_limiter_create(
+      config->threshold_db, config->sample_rate, config->num_channels,
+      config->attack_sec, config->release_sec,
+      (config->look_ahead_sec * config->sample_rate));
+  if (!lim->peak_limiter) {
+    warning("Failed to create peak limiter");
+    def_free(lim);
+    return NULL;
+  }
+
+  lim->delay_size = audio_effect_peak_limiter_get_delay(lim->peak_limiter);
+
+  /* Allocate intermediate buffer: must hold both render and flush output */
+  int out_buf_capacity = def_max(config->samples_per_channel, lim->delay_size);
+  lim->out_buf = def_mallocz(float, (config->num_channels * out_buf_capacity));
+  if (!lim->out_buf) {
+    warning("Failed to allocate limiter output buffer");
+    audio_effect_peak_limiter_destroy(lim->peak_limiter);
+    def_free(lim);
+    return NULL;
+  }
+
+  return lim;
 }
 
-void oar_limiter_destroy(oar_limiter_t* limiter) { def_free(limiter); }
-
-static double GetMaximumRequiredGain(const oar_limiter_t* limiter,
-                                     double sample) {
-  if (!limiter) return 1.0;  // Should not happen if called from Process
-  return fabs(sample) > limiter->ceiling ? limiter->ceiling / fabs(sample)
-                                         : 1.0;
+void oar_limiter_destroy(oar_limiter_t *lim) {
+  if (!lim) return;
+  if (lim->peak_limiter) audio_effect_peak_limiter_destroy(lim->peak_limiter);
+  def_free(lim->out_buf);
+  def_free(lim);
 }
 
-int oar_limiter_process(oar_limiter_t* limiter, oar_audio_block_t* block) {
-  if (!limiter || !block || !block->data) return ck_oar_error_inval;
+int oar_limiter_enable(oar_limiter_t *lim, int enable) {
+  if (!lim) return ck_oar_error_inval;
 
-  uint32_t num_channels = block->channels;
-  uint32_t num_frames = block->samples_per_channel;
-
-  if (num_channels == 0 || num_frames == 0) return ck_oar_error_inval;
-
-  float* max_samples = def_mallocz(float, num_frames);
-  float* limiter_env = def_mallocz(float, num_frames);
-
-  if (!max_samples || !limiter_env) {
-    def_free(max_samples);
-    def_free(limiter_env);
-    return ck_oar_error_nomem;
+  /* Reset state when re-enabling to discard stale delay buffer data */
+  if (enable && !lim->enabled && lim->peak_limiter) {
+    audio_effect_peak_limiter_flush(lim->peak_limiter, NULL);
   }
 
-  for (uint32_t c = 0; c < num_channels; ++c) {
-    const float* channel_data = block->data + (c * num_frames);
-    for (uint32_t f = 0; f < num_frames; ++f) {
-      float abs_val = fabsf(channel_data[f]);
-      if (abs_val > max_samples[f]) {
-        max_samples[f] = abs_val;
-      }
-    }
-  }
-
-  for (uint32_t f = 0; f < num_frames; ++f) {
-    double max_req_gain = GetMaximumRequiredGain(limiter, max_samples[f]);
-    if (max_req_gain < limiter->env) {
-      limiter->env = max_req_gain;
-    } else {
-      limiter->env =
-          limiter->release_time_constant * (limiter->env - max_req_gain) +
-          max_req_gain;
-    }
-    limiter_env[f] = (float)limiter->env;
-  }
-
-  for (uint32_t c = 0; c < num_channels; ++c) {
-    float* output_channel_data = block->data + (c * num_frames);
-    for (uint32_t f = 0; f < num_frames; ++f) {
-      output_channel_data[f] *= limiter_env[f];
-    }
-  }
-
-  free(max_samples);
-  free(limiter_env);
+  lim->enabled = enable ? 1 : 0;
   return ck_oar_ok;
+}
+
+int oar_limiter_process(oar_limiter_t *lim, oar_audio_block_t *output) {
+  if (!lim || !output || !output->data) return ck_oar_error_inval;
+
+  /* Passthrough when disabled or no peak limiter */
+  if (!lim->enabled || !lim->peak_limiter) return ck_oar_ok;
+
+  int samples = (int)output->samples_per_channel;
+
+  /* Process: output->data -> out_buf (emit-priming: returned == samples) */
+  int returned = audio_effect_peak_limiter_process_block(
+      lim->peak_limiter, output->data, lim->out_buf, samples);
+
+  if (returned < 0) {
+    warning("Limiter process error: %d", returned);
+    return ck_oar_error_inval;
+  }
+
+  for (int c = 0; c < lim->num_channels; c++) {
+    memcpy(&output->data[c * samples], &lim->out_buf[c * samples],
+           samples * sizeof(float));
+  }
+
+  return ck_oar_ok;
+}
+
+int oar_limiter_flush(oar_limiter_t *lim, oar_audio_block_t *output) {
+  if (!lim || !output || !output->data) return ck_oar_error_inval;
+
+  /* If disabled or no delay buffer, return 0 samples */
+  if (!lim->enabled || !lim->peak_limiter || lim->delay_size <= 0) {
+    output->samples_per_channel = 0;
+    return ck_oar_ok;
+  }
+
+  /* Flush: drains delay buffer into out_buf, then resets state. */
+  int returned =
+      audio_effect_peak_limiter_flush(lim->peak_limiter, lim->out_buf);
+
+  if (returned < 0) {
+    output->samples_per_channel = 0;
+    return ck_oar_error_inval;
+  } else if (returned > 0) {
+    for (int c = 0; c < lim->num_channels; c++) {
+      memcpy(&output->data[c * returned], &lim->out_buf[c * returned],
+             returned * sizeof(float));
+    }
+  }
+
+  output->samples_per_channel = (uint32_t)returned;
+  return ck_oar_ok;
+}
+
+int oar_limiter_set_threshold(oar_limiter_t *lim, float threshold_db) {
+  if (!lim) return ck_oar_error_inval;
+  audio_effect_peak_limiter_set_threshold(lim->peak_limiter, threshold_db);
+  return ck_oar_ok;
+}
+
+int oar_limiter_get_delay(const oar_limiter_t *lim) {
+  return lim ? lim->delay_size : 0;
 }

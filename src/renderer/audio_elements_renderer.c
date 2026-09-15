@@ -395,6 +395,8 @@ int audio_elements_renderer_add_data(audio_renderer_base_t *base,
          block->data,
          (block->samples_per_channel * block->channels * sizeof(float)));
 
+  self->base.has_data = 1;
+
 #ifdef __as_dbg__
   // Write original audio data to debug WAV file if available
   if (ctx->original) {
@@ -465,6 +467,8 @@ int audio_elements_renderer_render(audio_renderer_base_t *base,
            self->base.block.channels * self->base.block.samples_per_channel *
                sizeof(float));
   }
+
+  self->base.has_data = 0;
 
   return ret;
 }

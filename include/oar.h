@@ -262,16 +262,53 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
                         const oar_metadata_t *metadata);
 
 /**
- * @brief     Perform rendering
+ * @brief     Render one frame of audio
+ *
+ * Mixes all audio groups and elements, applies loudness gain and limiter
+ * (if enabled), and writes the result to output.
+ *
  * @param     [in] oar : OAR object
- * @param     [out] output : Output audio data in planar format.
+ * @param     [in,out] output : Output audio block in planar format.
+ *            Caller must set output->channels (must match
+ *            oar_get_number_of_output_channels()) and
+ *            output->samples_per_channel (must be at least
+ *            oar_get_samples_per_channel()) before each call.
+ *            output->data must be allocated for at least
+ *            oar_get_samples_per_channel() *
+ *            oar_get_number_of_output_channels() floats.
+ *            On return, output->samples_per_channel is set to
+ *            oar_get_samples_per_channel().
  * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
- *            parameters (including channel/sample mismatch or no audio groups),
- *            ck_oar_error_nomem (-12) for memory allocation failure
- * @note      Renders all audio groups. For single group, uses zero-copy
- *            optimization. For multiple groups, mixes all group outputs.
+ *            parameters (including channel mismatch, insufficient samples,
+ *            no audio groups, or no data), ck_oar_error_nomem (-12) for
+ *            memory allocation failure
+ * @note      When limiter is enabled, the first delay_size samples are
+ *            zero-padded (priming). Use oar_get_limiter_delay() for
+ *            latency compensation. Output length always equals
+ *            oar_get_samples_per_channel().
  */
 int oar_render(oar_t *oar, oar_audio_block_t *output);
+
+/**
+ * @brief     Flush limiter delay buffer and retrieve remaining samples
+ *
+ * Drains the limiter's look-ahead delay buffer at the end of streaming
+ * playback. After flush, the limiter state is reset to initial state
+ * (including priming), so rendering can resume with oar_render() directly.
+ *
+ * @param     [in] oar : OAR object
+ * @param     [in,out] output : Output audio block in planar format.
+ *            Caller must set output->channels (must match
+ *            oar_get_number_of_output_channels()).
+ *            output->data must be allocated for at least
+ *            oar_get_limiter_delay() *
+ *            oar_get_number_of_output_channels() floats.
+ *            On return, output->samples_per_channel is set to the number
+ *            of flushed samples (0 if limiter is disabled or no delay).
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters
+ */
+int oar_flush(oar_t *oar, oar_audio_block_t *output);
 
 /**
  * @brief     Enable/disable loudness processor
@@ -301,9 +338,33 @@ int oar_set_loudness(oar_t *oar, uint32_t gid, float loudness,
  * @param     [in] oar : OAR object
  * @param     [in] enable : 1 to enable, 0 to disable
  * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
- *            parameters
+ *            parameters, ck_oar_error_notsup (-95) if limiter is not available
+ * @note      Uses a look-ahead peak limiter with attack/release curves and hard
+ *            limit. The limiter introduces a delay of delay_size samples.
+ *            When re-enabling (after disable), the limiter state is reset
+ *            to discard stale delay buffer data.
  */
 int oar_enable_limiter(oar_t *oar, int enable);
+
+/**
+ * @brief     Set limiter threshold dynamically
+ * @param     [in] oar : OAR object
+ * @param     [in] threshold_db : New threshold in dB (e.g., -1.0, -3.0)
+ * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
+ *            parameters, ck_oar_error_notsup (-95) if limiter is not available
+ * @note      Updates the threshold in-place without re-creating the limiter.
+ *            Delay buffer and gain envelope state are preserved.
+ */
+int oar_set_limiter_threshold(oar_t *oar, float threshold_db);
+
+/**
+ * @brief     Get limiter delay size
+ * @param     [in] oar : OAR object
+ * @return    Limiter delay in samples (equals look-ahead size), 0 if invalid
+ * @note      This value is constant and represents both the delay buffer size
+ *            and the look-ahead size in the current implementation.
+ */
+int oar_get_limiter_delay(oar_t *oar);
 
 /**
  * @brief     Enable or disable head tracking for all audio elements.
