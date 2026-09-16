@@ -166,6 +166,8 @@ int run_all_tests(test_entry_t *tests, int num_tests, int argc, char *argv[]) {
   printf("========================================\n");
 
   int result = 0;
+  int num_skipped = 0;
+  int num_failed = 0;
   int *tc_results = (int *)calloc(num_tests, sizeof(int));
   if (!tc_results) {
     fprintf(stderr, "Failed to allocate results array\n");
@@ -175,7 +177,12 @@ int run_all_tests(test_entry_t *tests, int num_tests, int argc, char *argv[]) {
   for (int i = 0; i < num_tests; i++) {
     printf("\n--- Running %s: %s ---\n", tests[i].name, tests[i].description);
     tc_results[i] = run_test_in_child(tests, num_tests, i);
-    if (tc_results[i] == TEST_FAIL) result = 1;
+    if (tc_results[i] == TEST_FAIL) {
+      result = 1;
+      num_failed++;
+    } else if (tc_results[i] == TEST_SKIP) {
+      num_skipped++;
+    }
   }
 
   printf("\n========================================\n");
@@ -186,14 +193,20 @@ int run_all_tests(test_entry_t *tests, int num_tests, int argc, char *argv[]) {
            : tc_results[i] == TEST_SKIP ? "SKIPPED"
                                         : "FAILED/CRASHED");
   }
+  printf("\n%d passed, %d skipped, %d failed/crashed out of %d test(s)\n",
+         num_tests - num_skipped - num_failed, num_skipped, num_failed,
+         num_tests);
   printf("========================================\n");
 
   free(tc_results);
 
-  if (result == 0) {
-    printf("\nAll tests passed.\n");
-  } else {
+  if (result != 0) {
     printf("\nSome tests failed or crashed. Review output above.\n");
+  } else if (num_skipped > 0) {
+    printf("\nAll executed tests passed, but %d test(s) skipped.\n",
+           num_skipped);
+  } else {
+    printf("\nAll tests passed.\n");
   }
 
   return result;

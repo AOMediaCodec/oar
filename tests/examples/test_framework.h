@@ -126,11 +126,16 @@ typedef struct {
  * When called with "--child <index>" (Windows child-process mode), runs only
  * the test at @p index and returns its result directly.
  *
+ * The summary includes per-test status and aggregate counts
+ * (passed / skipped / failed out of total). The final message distinguishes
+ * three outcomes: all passed, some skipped (no failures), or some failed.
+ * Skipped tests do not affect the return value.
+ *
  * @param tests     Array of test entries.
  * @param num_tests  Number of entries in @p tests.
  * @param argc       Argument count from main().
  * @param argv       Argument vector from main().
- * @return 0 if all tests passed, non-zero if any failed.
+ * @return 0 if no test failed or crashed, non-zero otherwise.
  */
 int run_all_tests(test_entry_t *tests, int num_tests, int argc, char *argv[]);
 
