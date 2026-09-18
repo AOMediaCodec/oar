@@ -79,7 +79,7 @@ int audio_element_context_init(audio_element_context_t *ctx, uint32_t id,
 #ifdef __as_dbg__
   ctx->original = wav_writer_open(ck_tag_original, id, sample_rate,
                                   rid_channels_count(ctx->rid));
-  if (!ctx->original) warning("Failed to open WAV file for stream %u", id);
+  if (!ctx->original) warn("Failed to open WAV file for stream %u", id);
 #endif
 
   return ck_oar_ok;
@@ -183,7 +183,7 @@ void metadata_item_elapse(metadata_item_t *item, uint32_t samples_per_channel) {
   }
 
   if (item->start > item->duration) {
-    warning(
+    warn(
         "Metadata item %d has negative duration (%d vs %d). reset metadata "
         "item.",
         item->id, item->start, item->duration);
@@ -244,8 +244,8 @@ int audio_block_sub_frames_apply_gain(oar_audio_block_t *block,
             gain_value =
                 db_to_linear_float32(metadata->gain.gain_array[relative_pos]);
           } else {
-            warning("Gain array out of bounds for metadata id %u",
-                    metadata->gain.id);
+            warn("Gain array out of bounds for metadata id %u",
+                 metadata->gain.id);
           }
         } else if (metadata->gain.param_type == ck_param_animated) {
           /* Default to 0 dB (unity) if no animation type matches */
@@ -278,9 +278,9 @@ int audio_block_sub_frames_apply_gain(oar_audio_block_t *block,
                           0.5f,
                       metadata->duration, relative_pos));
             } else {
-              warning("Unknown animation type %d for gain metadata id %u",
-                      metadata->gain.animated_gains.animation_type,
-                      metadata->gain.id);
+              warn("Unknown animation type %d for gain metadata id %u",
+                   metadata->gain.animated_gains.animation_type,
+                   metadata->gain.id);
             }
             /* Interpolate in dB domain, then convert to linear */
             gain_value = db_to_linear_float32(gain_value);
@@ -367,9 +367,9 @@ oar_metadata_t *metadata_constant_polar_positions_create(
                                      distance_anim->end),
                   bezier_linear_factor_get(metadata->duration, relative_pos));
         } else {
-          warning("Unsupported animation type (%u) for polar object positions.",
-                  metadata->object_positions.animated_polar_positions[obj_idx]
-                      .animation_type);
+          warn("Unsupported animation type (%u) for polar object positions.",
+               metadata->object_positions.animated_polar_positions[obj_idx]
+                   .animation_type);
         }
 
       } else {
@@ -422,7 +422,7 @@ oar_metadata_t *metadata_constant_polar_positions_create(
           cartesian_pos.x = 0.0f;
           cartesian_pos.y = 0.0f;
           cartesian_pos.z = 0.0f;
-          warning(
+          warn(
               "Unsupported animation type (%u) for cartesian object positions.",
               metadata->object_positions.animated_cartesian_positions[obj_idx]
                   .animation_type);
@@ -463,7 +463,7 @@ int audio_renderer_enable_head_tracking(audio_renderer_base_t *base,
     ret = base->lib->set_attribute(&base->ctx, ck_attribute_head_tracking,
                                    &enable);
     if (ret != ck_oar_ok) {
-      warning("Failed to set head tracking for renderer %s", base->lib->id);
+      warn("Failed to set head tracking for renderer %s", base->lib->id);
     }
   }
 

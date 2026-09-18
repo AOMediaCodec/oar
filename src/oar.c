@@ -165,7 +165,7 @@ oar_t *oar_create(const oar_config_t *config) {
   };
   oar->limiter = oar_limiter_create(&limiter_config);
   if (!oar->limiter) {
-    warning("Failed to create limiter");
+    warn("Failed to create limiter");
     /* Continue without limiter - don't fail OAR creation */
   }
 
@@ -180,7 +180,7 @@ oar_t *oar_create(const oar_config_t *config) {
   oar->mixed =
       wav_writer_open(ck_tag_mixed, 0, oar->config.sampling_rate,
                       layout_channels_count(oar->config.target_layout));
-  if (!oar->mixed) warning("Failed to open WAV file for output");
+  if (!oar->mixed) warn("Failed to open WAV file for output");
 #endif
 
   return oar;
@@ -272,7 +272,7 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
 
   if (vector_find(oar->groups, def_value_wrap_instance_u32(gid), _find_group_id,
                   &v) < 0) {
-    warning("Audio group %u does not exist.", gid);
+    warn("Audio group %u does not exist.", gid);
     return ck_oar_error_inval;
   }
   group = def_value_wrap_type_ptr(audio_group_t, &v);
@@ -281,7 +281,7 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
     audio_group_t *_group = def_value_wrap_ptr(vector_at(oar->groups, i));
     if (vector_find(_group->renderers, def_value_wrap_instance_u32(id),
                     _find_element_id, &v) >= 0) {
-      warning("Audio element %u already exists in another group.", id);
+      warn("Audio element %u already exists in another group.", id);
       return ck_oar_error_busy;
     }
   }
@@ -308,8 +308,8 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
           renderer = binaural_renderer;
           break;
         } else {
-          warning("Failed to add element %u to binaural renderer. Error: %d",
-                  id, ret);
+          warn("Failed to add element %u to binaural renderer. Error: %d", id,
+               ret);
         }
       }
     }
@@ -437,15 +437,13 @@ int oar_set_metadata_unit_to_process(oar_t *oar, oar_metadata_type_t type,
   if (!oar) return ck_oar_error_inval;
 
   if (type != ck_metadata_object_positions) {
-    warning(
-        "Only object positions are supported for setting samples to process.");
+    warn("Only object positions are supported for setting samples to process.");
     return ck_oar_error_notsup;
   }
 
   if (samples == 0 || oar->config.samples_per_channel < samples) {
-    warning(
-        "metadata unit samples (%u) is invalid for samples_per_channel (%u).",
-        samples, oar->config.samples_per_channel);
+    warn("metadata unit samples (%u) is invalid for samples_per_channel (%u).",
+         samples, oar->config.samples_per_channel);
     return ck_oar_error_inval;
   }
 

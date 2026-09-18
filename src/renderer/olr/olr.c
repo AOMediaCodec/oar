@@ -123,7 +123,7 @@ static int _open(renderer_library_context_t *ctx) {
     // of _open but as a fallback:
     olr->num_objects =
         1;  // Default to 1 if somehow an unsupported type gets through
-    warning(
+    warn(
         "OLR: Unexpected input type %d in num_objects determination, "
         "defaulting to 1 object.",
         ctx->in);
@@ -149,7 +149,7 @@ static int _set_attribute(renderer_library_context_t *ctx,
                           rendering_attribute_t attr, const void *value) {
   switch (attr) {
     case ck_attribute_head_tracking:
-      warning(
+      warn(
           "OLR: Head tracking attribute not directly supported by "
           "object_audio_renderer.");
       break;
@@ -168,12 +168,12 @@ static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
     case ck_metadata_object_positions: {
       if (metadata->object_positions.param_type != ck_param_constant ||
           metadata->object_positions.position_type != ck_polar) {
-        warning("only support constant object positions with polar.");
+        warn("only support constant object positions with polar.");
         return ck_oar_error_notsup;
       }
       uint32_t n = olr->num_objects;
       if (n < metadata->object_positions.num_objects) {
-        warning(
+        warn(
             "OLR: Number of objects in metadata (%d) exceeds renderer's "
             "capacity (%d). Clipping.",
             metadata->object_positions.num_objects, n);
@@ -198,7 +198,7 @@ static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
       object_audio_renderer_add_metadatas(olr->api, olr->metadata_blocks, n);
     } break;
     case ck_metadata_head_rotation:
-      warning(
+      warn(
           "OLR: Head rotation metadata not directly supported by "
           "object_audio_renderer.");
       break;
@@ -215,7 +215,7 @@ static int _render(renderer_library_context_t *ctx, const oar_audio_block_t *in,
       olr->api, (float *)in->data, in->samples_per_channel, olr->num_objects,
       olr->offset, (float *)out->data);
   olr->offset += in->samples_per_channel;
-  if (ret != ck_oar_ok) warning("OLR: Rendering failed with errno %d.", ret);
+  if (ret != ck_oar_ok) warn("OLR: Rendering failed with errno %d.", ret);
 
   return ret;
 }

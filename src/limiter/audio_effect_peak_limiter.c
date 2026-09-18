@@ -116,11 +116,11 @@ static inline float hard_limit(float sample, float threshold) {
  */
 static inline float clampf(float val, float min, float max, const char* name) {
   if (val < min) {
-    warning("%s %.4f < min %.4f, clamped", name, val, min);
+    warn("%s %.4f < min %.4f, clamped", name, val, min);
     return min;
   }
   if (val > max) {
-    warning("%s %.4f > max %.4f, clamped", name, val, max);
+    warn("%s %.4f > max %.4f, clamped", name, val, max);
     return max;
   }
   return val;
@@ -368,15 +368,15 @@ audio_effect_peak_limiter_t* audio_effect_peak_limiter_create(
     int min_delay = (int)(def_delay_sec_min * sample_rate);
     int max_delay = (int)(def_delay_sec_max * sample_rate);
     if (delay_size < min_delay) {
-      warning("delay_size %d < min %d (0.1ms), clamped", delay_size, min_delay);
+      warn("delay_size %d < min %d (0.1ms), clamped", delay_size, min_delay);
       delay_size = min_delay;
     }
     if (delay_size > max_delay) {
-      warning("delay_size %d > max %d (20ms), clamped", delay_size, max_delay);
+      warn("delay_size %d > max %d (20ms), clamped", delay_size, max_delay);
       delay_size = max_delay;
     }
   } else if (delay_size < 0) {
-    warning("delay_size %d < 0, set to 0 (no-delay mode)", delay_size);
+    warn("delay_size %d < 0, set to 0 (no-delay mode)", delay_size);
     delay_size = 0;
   }
 
@@ -384,7 +384,7 @@ audio_effect_peak_limiter_t* audio_effect_peak_limiter_create(
   if (delay_size > 0) {
     float look_ahead_sec = (float)delay_size / sample_rate;
     if (atk_sec > look_ahead_sec) {
-      warning(
+      warn(
           "attack %.4fs > look-ahead %.4fs, hard-limit will trigger frequently",
           atk_sec, look_ahead_sec);
     }
@@ -406,14 +406,14 @@ audio_effect_peak_limiter_t* audio_effect_peak_limiter_create(
   if (delay_size > 0) {
     ths->delay_data = def_mallocz(float, num_channels * ths->delay_size);
     if (!ths->delay_data) {
-      warning("Failed to allocate delay_data");
+      warn("Failed to allocate delay_data");
       audio_effect_peak_limiter_destroy(ths);
       return NULL;
     }
 
     ths->peak_data = def_mallocz(float, ths->delay_size);
     if (!ths->peak_data) {
-      warning("Failed to allocate peak_data");
+      warn("Failed to allocate peak_data");
       audio_effect_peak_limiter_destroy(ths);
       return NULL;
     }

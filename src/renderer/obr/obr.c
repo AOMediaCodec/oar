@@ -154,12 +154,12 @@ static int _set_attribute(renderer_library_context_t *ctx,
           _get_binaural_filter_profile(params->profile);
 
       if (element_type == kObrInvalidType) {
-        warning("Unsupported element rendering id 0x%x", params->id);
+        warn("Unsupported element rendering id 0x%x", params->id);
         return ck_oar_error_inval;
       }
 
       if (obr_add_audio_element(obr->api, element_type, profile) < 0) {
-        warning("Failed to add element rendering id %d", params->id);
+        warn("Failed to add element rendering id %d", params->id);
         return ck_oar_error_inval;
       }
 
@@ -175,7 +175,7 @@ static int _set_attribute(renderer_library_context_t *ctx,
       if (num_elements == 0) return ck_oar_error_inval;
       if (index != (uint32_t)(num_elements - 1)) return ck_oar_error_notsup;
       if (obr_remove_last_audio_element(obr->api) < 0) {
-        warning("Failed to remove audio element at index %u", index);
+        warn("Failed to remove audio element at index %u", index);
         return ck_oar_error_inval;
       }
     } break;
@@ -183,14 +183,14 @@ static int _set_attribute(renderer_library_context_t *ctx,
       element_head_locked_t *params = (element_head_locked_t *)value;
       int num_elements = obr_get_number_of_audio_elements(obr->api);
       if (params->index >= num_elements) {
-        warning("Invalid element index %d, element count %d", params->index,
-                num_elements);
+        warn("Invalid element index %d, element count %d", params->index,
+             num_elements);
         return ck_oar_error_inval;
       }
       if (obr_set_element_head_locked(obr->api, params->index,
                                       !!params->locked) < 0) {
-        warning("Failed to set head locked state %u for element index %d",
-                !!params->locked, params->index);
+        warn("Failed to set head locked state %u for element index %d",
+             !!params->locked, params->index);
         return ck_oar_error_inval;
       }
     } break;
@@ -209,13 +209,12 @@ static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
       int num_elements = obr_get_number_of_audio_elements(obr->api);
       if (metadata->object_positions.param_type != ck_param_constant ||
           metadata->object_positions.position_type != ck_polar) {
-        warning("only support constant object positions with polar.");
+        warn("only support constant object positions with polar.");
         return ck_oar_error_notsup;
       }
 
       if (index >= num_elements) {
-        warning("Invalid element index %d, element count %d", index,
-                num_elements);
+        warn("Invalid element index %d, element count %d", index, num_elements);
         return ck_oar_error_inval;
       }
 
@@ -232,7 +231,7 @@ static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
       if (obr_set_head_rotation(
               obr->api, metadata->head_rotation.w, metadata->head_rotation.x,
               metadata->head_rotation.y, metadata->head_rotation.z) < 0) {
-        warning("Failed to set head rotation for element index %d", index);
+        warn("Failed to set head rotation for element index %d", index);
         return ck_oar_error_inval;
       }
       break;
