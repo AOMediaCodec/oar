@@ -117,7 +117,7 @@ audio_elements_renderer_t *audio_elements_renderer_new(
 
   self->base.lib = renderer_library_manager_find_library(manager, ctx);
   if (!self->base.lib) {
-    warning("Failed to find renderer library for stream %u", id);
+    warn("Failed to find renderer library for stream %u", id);
     def_free(self);
     return 0;
   }
@@ -145,7 +145,7 @@ audio_elements_renderer_t *audio_elements_renderer_new(
       wav_writer_open(ck_tag_rendered, id, oar_config->sampling_rate,
                       layout_channels_count(oar_config->target_layout));
   if (!self->rendered)
-    warning("Failed to open WAV file for rendered stream %u", id);
+    warn("Failed to open WAV file for rendered stream %u", id);
 #endif
 
   return self;
@@ -178,7 +178,7 @@ int audio_elements_renderer_add_element(
   if (!self || !config) return ck_oar_error_inval;
 
   if (hash_map_get(self->element_map, element_id)) {
-    warning("Element %u already exists", element_id);
+    warn("Element %u already exists", element_id);
     return ck_oar_error_busy;
   }
 
@@ -205,7 +205,7 @@ int audio_elements_renderer_add_element(
           &self->base.ctx, ck_attribute_head_tracking,
           &self->base.head_tracking_enabled);
       if (err != ck_oar_ok)
-        warning("Failed to propagate head tracking state: %d", err);
+        warn("Failed to propagate head tracking state: %d", err);
     }
   }
 
@@ -242,7 +242,7 @@ int audio_elements_renderer_remove_element(audio_renderer_base_t *base,
   audio_element_context_t *ctx = def_value_wrap_optional_type_ptr(
       audio_element_context_t, hash_map_get(self->element_map, element_id));
   if (!ctx) {
-    warning("Element %u not found for removal", element_id);
+    warn("Element %u not found for removal", element_id);
     return ck_oar_error_inval;
   }
 
@@ -251,7 +251,7 @@ int audio_elements_renderer_remove_element(audio_renderer_base_t *base,
     int ret = self->base.lib->set_attribute(
         &self->base.ctx, ck_attribute_remove_element, &lib_index);
     if (ret != ck_oar_ok) {
-      warning(
+      warn(
           "Cannot remove element %u from renderer library (error %d). "
           "Removal aborted; element remains active.",
           element_id, ret);
@@ -316,7 +316,7 @@ int audio_elements_renderer_update_element_metadata(
       (audio_element_context_t *)def_value_wrap_optional_ptr(
           hash_map_get(self->element_map, element_id));
   if (!ctx) {
-    warning("Element %u not found", element_id);
+    warn("Element %u not found", element_id);
     return ck_oar_error_inval;
   }
 
@@ -343,21 +343,21 @@ int audio_elements_renderer_add_data(audio_renderer_base_t *base,
       (audio_element_context_t *)def_value_wrap_optional_ptr(
           hash_map_get(self->element_map, element_id));
   if (!ctx) {
-    warning("Element %u not found", element_id);
+    warn("Element %u not found", element_id);
     return ck_oar_error_inval;
   }
 
   // Validate block dimensions match config to prevent OBR buffer size mismatch
   // crash and heap overflow from inconsistent stride/length in memcpy.
   if (block->samples_per_channel != self->base.ctx.samples_per_frame) {
-    warning("Input block samples per channel (%u) don't match config (%u)",
-            block->samples_per_channel, self->base.ctx.samples_per_frame);
+    warn("Input block samples per channel (%u) don't match config (%u)",
+         block->samples_per_channel, self->base.ctx.samples_per_frame);
     return ck_oar_error_inval;
   }
 
   if (block->channels != (uint32_t)rid_channels_count(ctx->rid)) {
-    warning("Input block channels (%u) don't match element channels (%u)",
-            block->channels, rid_channels_count(ctx->rid));
+    warn("Input block channels (%u) don't match element channels (%u)",
+         block->channels, rid_channels_count(ctx->rid));
     return ck_oar_error_inval;
   }
 
@@ -483,7 +483,7 @@ int audio_elements_renderer_set_element_head_locked(audio_renderer_base_t *base,
       (audio_element_context_t *)def_value_wrap_optional_ptr(
           hash_map_get(self->element_map, element_id));
   if (!ctx) {
-    warning("Element %u not found", element_id);
+    warn("Element %u not found", element_id);
     return ck_oar_error_inval;
   }
 
