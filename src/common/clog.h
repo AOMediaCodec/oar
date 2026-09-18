@@ -45,7 +45,6 @@ void set_log_level(log_level_t level);
 #define fatal(fmt, ...) def_log(ck_log_level_fatal, fmt, ##__VA_ARGS__)
 #define error(fmt, ...) def_log(ck_log_level_error, fmt, ##__VA_ARGS__)
 #define warn(fmt, ...) def_log(ck_log_level_warn, fmt, ##__VA_ARGS__)
-#define warning(fmt, ...) def_log(ck_log_level_warn, fmt, ##__VA_ARGS__)
 #define info(fmt, ...) def_log(ck_log_level_info, fmt, ##__VA_ARGS__)
 #define debug(fmt, ...) def_log(ck_log_level_debug, fmt, ##__VA_ARGS__)
 #define trace(fmt, ...) def_log(ck_log_level_trace, fmt, ##__VA_ARGS__)

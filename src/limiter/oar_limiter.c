@@ -50,7 +50,7 @@ oar_limiter_t *oar_limiter_create(const oar_limiter_config_t *config) {
       config->attack_sec, config->release_sec,
       (config->look_ahead_sec * config->sample_rate));
   if (!lim->peak_limiter) {
-    warning("Failed to create peak limiter");
+    warn("Failed to create peak limiter");
     def_free(lim);
     return NULL;
   }
@@ -61,7 +61,7 @@ oar_limiter_t *oar_limiter_create(const oar_limiter_config_t *config) {
   int out_buf_capacity = def_max(config->samples_per_channel, lim->delay_size);
   lim->out_buf = def_mallocz(float, (config->num_channels * out_buf_capacity));
   if (!lim->out_buf) {
-    warning("Failed to allocate limiter output buffer");
+    warn("Failed to allocate limiter output buffer");
     audio_effect_peak_limiter_destroy(lim->peak_limiter);
     def_free(lim);
     return NULL;
@@ -102,7 +102,7 @@ int oar_limiter_process(oar_limiter_t *lim, oar_audio_block_t *output) {
       lim->peak_limiter, output->data, lim->out_buf, samples);
 
   if (returned < 0) {
-    warning("Limiter process error: %d", returned);
+    warn("Limiter process error: %d", returned);
     return ck_oar_error_inval;
   }
 
