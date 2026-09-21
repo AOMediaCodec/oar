@@ -182,7 +182,7 @@ audio_element_renderer_t *audio_element_renderer_new(
 
   ctx->in = audio_element_config_to_ri_id(config);
   if (ctx->in == ck_rid_none) {
-    warning("Unsupported input self.");
+    warn("Unsupported input self.");
     audio_element_renderer_delete(&self->base);
     return 0;
   }
@@ -200,7 +200,7 @@ audio_element_renderer_t *audio_element_renderer_new(
 
   self->base.lib = renderer_library_manager_find_library(manager, ctx);
   if (!self->base.lib) {
-    warning("Failed to find self library for stream %u", id);
+    warn("Failed to find self library for stream %u", id);
     audio_element_renderer_delete(&self->base);
     return 0;
   }
@@ -237,7 +237,7 @@ audio_element_renderer_t *audio_element_renderer_new(
                       : ck_binaural_filter_profile_default;
     if (self->base.lib->set_attribute(ctx, ck_attribute_add_element, &set) !=
         ck_oar_ok) {
-      warning("Failed to set binaural filter profile for stream %u", id);
+      warn("Failed to set binaural filter profile for stream %u", id);
       audio_element_renderer_delete(&self->base);
       return 0;
     }
@@ -256,7 +256,7 @@ audio_element_renderer_t *audio_element_renderer_new(
       wav_writer_open(ck_tag_rendered, id, ctx->sample_rate,
                       layout_channels_count(oar_config->target_layout));
   if (!self->rendered)
-    warning("Failed to open WAV file for rendered stream %u", id);
+    warn("Failed to open WAV file for rendered stream %u", id);
 #endif
 
   return self;
@@ -283,8 +283,8 @@ static int audio_element_renderer_update_metadata(
   if (!self) return ck_oar_error_inval;
 
   if (self->element.eid != element_id) {
-    warning("Element ID mismatch: expected %u, got %u", self->element.eid,
-            element_id);
+    warn("Element ID mismatch: expected %u, got %u", self->element.eid,
+         element_id);
     return ck_oar_error_inval;
   }
 
@@ -307,20 +307,20 @@ int audio_element_renderer_update_data(audio_renderer_base_t *base, uint32_t id,
   if (!self) return ck_oar_error_inval;
 
   if (self->element.eid != id) {
-    warning("Element ID mismatch: expected %u, got %u", self->element.eid, id);
+    warn("Element ID mismatch: expected %u, got %u", self->element.eid, id);
     return ck_oar_error_inval;
   }
 
   if (!block || !block->data) return ck_oar_error_inval;
 
   if (block->channels != self->base.block.channels) {
-    warning("Input block channels (%u) don't match self channels (%u)",
-            block->channels, self->base.block.channels);
+    warn("Input block channels (%u) don't match self channels (%u)",
+         block->channels, self->base.block.channels);
     return ck_oar_error_inval;
   }
 
   if (block->samples_per_channel != self->base.block.samples_per_channel) {
-    warning(
+    warn(
         "Input block samples per channel (%u) don't match self samples per "
         "channel (%u)",
         block->samples_per_channel, self->base.block.samples_per_channel);
@@ -421,8 +421,8 @@ int audio_element_renderer_set_element_head_locked(audio_renderer_base_t *base,
   if (!self) return ck_oar_error_inval;
 
   if (self->element.eid != element_id) {
-    warning("Element ID mismatch: expected %u, got %u", self->element.eid,
-            element_id);
+    warn("Element ID mismatch: expected %u, got %u", self->element.eid,
+         element_id);
     return ck_oar_error_inval;
   }
 
