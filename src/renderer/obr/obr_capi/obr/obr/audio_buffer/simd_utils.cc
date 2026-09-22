@@ -94,7 +94,7 @@ void AddPointwise(size_t length, const float* input_a, const float* input_b,
   const SimdVector* input_b_vector =
       reinterpret_cast<const SimdVector*>(input_b);
   SimdVector* output_vector = reinterpret_cast<SimdVector*>(output);
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool inputs_aligned = IsAligned(input_a) && IsAligned(input_b);
   const bool output_aligned = IsAligned(output);
@@ -126,7 +126,7 @@ void AddPointwise(size_t length, const float* input_a, const float* input_b,
   for (size_t i = 0; i < GetNumChunks(length); ++i) {
     output_vector[i] = SIMD_ADD(input_a_vector[i], input_b_vector[i]);
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
 
   // Add samples at the end that were missed by the SIMD chunking.
   const size_t leftover_samples = GetLeftoverSamples(length);
@@ -148,7 +148,7 @@ void SubtractPointwise(size_t length, const float* input_a,
       reinterpret_cast<const SimdVector*>(input_b);
   SimdVector* output_vector = reinterpret_cast<SimdVector*>(output);
 
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool inputs_aligned = IsAligned(input_a) && IsAligned(input_b);
   const bool output_aligned = IsAligned(output);
@@ -180,7 +180,7 @@ void SubtractPointwise(size_t length, const float* input_a,
   for (size_t i = 0; i < GetNumChunks(length); ++i) {
     output_vector[i] = SIMD_SUB(input_b_vector[i], input_a_vector[i]);
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
 
   // Subtract samples at the end that were missed by the SIMD chunking.
   const size_t leftover_samples = GetLeftoverSamples(length);
@@ -256,7 +256,7 @@ void MultiplyAndAccumulatePointwise(size_t length, const float* input_a,
       reinterpret_cast<const SimdVector*>(input_b);
   SimdVector* accumulator_vector = reinterpret_cast<SimdVector*>(accumulator);
 
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool inputs_aligned = IsAligned(input_a) && IsAligned(input_b);
   const bool accumulator_aligned = IsAligned(accumulator);
@@ -294,7 +294,7 @@ void MultiplyAndAccumulatePointwise(size_t length, const float* input_a,
     accumulator_vector[i] = SIMD_MULTIPLY_ADD(
         input_a_vector[i], input_b_vector[i], accumulator_vector[i]);
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
 
   // Apply gain and accumulate to samples at the end that were missed by the
   // SIMD chunking.
@@ -314,7 +314,7 @@ void ScalarMultiply(size_t length, float gain, const float* input,
   SimdVector* output_vector = reinterpret_cast<SimdVector*>(output);
 
   const SimdVector gain_vector = SIMD_LOAD_ONE_FLOAT(gain);
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool input_aligned = IsAligned(input);
   const bool output_aligned = IsAligned(output);
@@ -344,7 +344,7 @@ void ScalarMultiply(size_t length, float gain, const float* input,
   for (size_t i = 0; i < GetNumChunks(length); ++i) {
     output_vector[i] = SIMD_MULTIPLY(gain_vector, input_vector[i]);
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
 
   // Apply gain to samples at the end that were missed by the SIMD chunking.
   const size_t leftover_samples = GetLeftoverSamples(length);
@@ -363,7 +363,7 @@ void ScalarMultiplyAndAccumulate(size_t length, float gain, const float* input,
   SimdVector* accumulator_vector = reinterpret_cast<SimdVector*>(accumulator);
 
   const SimdVector gain_vector = SIMD_LOAD_ONE_FLOAT(gain);
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool input_aligned = IsAligned(input);
   const bool accumulator_aligned = IsAligned(accumulator);
@@ -399,7 +399,7 @@ void ScalarMultiplyAndAccumulate(size_t length, float gain, const float* input,
     accumulator_vector[i] =
         SIMD_MULTIPLY_ADD(gain_vector, input_vector[i], accumulator_vector[i]);
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
 
   // Apply gain and accumulate to samples at the end that were missed by the
   // SIMD chunking.
@@ -419,7 +419,7 @@ void ReciprocalSqrt(size_t length, const float* input, float* output) {
   SimdVector* output_vector = reinterpret_cast<SimdVector*>(output);
 #endif  // !defined(SIMD_DISABLED)
 
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool input_aligned = IsAligned(input);
   const bool output_aligned = IsAligned(output);
@@ -448,7 +448,7 @@ void ReciprocalSqrt(size_t length, const float* input, float* output) {
   for (size_t i = 0; i < GetNumChunks(length); ++i) {
     output_vector[i] = SIMD_RECIPROCAL_SQRT(input_vector[i]);
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
 
   // Apply to samples at the end that were missed by the SIMD chunking.
   const size_t leftover_samples = GetLeftoverSamples(length);
@@ -467,7 +467,7 @@ void Sqrt(size_t length, const float* input, float* output) {
   SimdVector* output_vector = reinterpret_cast<SimdVector*>(output);
 #endif  // !defined(SIMD_DISABLED)
 
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool input_aligned = IsAligned(input);
   const bool output_aligned = IsAligned(output);
@@ -497,7 +497,7 @@ void Sqrt(size_t length, const float* input, float* output) {
     // This should be faster than using a sqrt method : https://goo.gl/XRKwFp
     output_vector[i] = SIMD_SQRT(input_vector[i]);
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
 
   // Apply to samples at the end that were missed by the SIMD chunking.
   const size_t leftover_samples = GetLeftoverSamples(length);
@@ -519,7 +519,7 @@ void ApproxComplexMagnitude(size_t length, const float* input, float* output) {
   const bool output_aligned = IsAligned(output);
 #endif  // !defined(SIMD_DISABLED)
 
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   if (input_aligned && output_aligned) {
     for (size_t out_index = 0; out_index < num_chunks; ++out_index) {
       const size_t first_index = out_index * 2;
@@ -643,7 +643,7 @@ void ApproxComplexMagnitude(size_t length, const float* input, float* output) {
       vst1q_f32(&output[out_index * SIMD_LENGTH], output_temp);
     }
   }
-#endif  // SIMD_SSE
+#endif  // SIMD_SSE || SIMD_WASM
 
   // Apply to samples at the end that were missed by the SIMD chunking.
   const size_t leftover_samples = GetLeftoverSamples(length);
@@ -712,7 +712,7 @@ void MonoFromStereoSimd(size_t length, const float* left, const float* right,
   SimdVector* mono_vector = reinterpret_cast<SimdVector*>(mono);
 
   const SimdVector inv_root_two_vec = SIMD_LOAD_ONE_FLOAT(kInverseSqrtTwo);
-#ifdef SIMD_SSE
+#if defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t num_chunks = GetNumChunks(length);
   const bool inputs_aligned = IsAligned(left) && IsAligned(right);
   const bool mono_aligned = IsAligned(mono);
@@ -748,7 +748,7 @@ void MonoFromStereoSimd(size_t length, const float* left, const float* right,
     mono_vector[i] = SIMD_MULTIPLY(inv_root_two_vec,
                                    SIMD_ADD(left_vector[i], right_vector[i]));
   }
-#endif  // SIMD_SSE
+#endif  // defined(SIMD_SSE) || defined(SIMD_WASM)
   const size_t leftover_samples = GetLeftoverSamples(length);
   // Downmix samples at the end that were missed by the SIMD chunking.
   ABSL_DCHECK_GE(length, leftover_samples);
