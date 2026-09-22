@@ -13,8 +13,25 @@
 #ifndef OBR_AUDIO_BUFFER_SIMD_MACROS_H_
 #define OBR_AUDIO_BUFFER_SIMD_MACROS_H_
 
-#if !defined(DISABLE_SIMD) && (defined(__x86_64__) || defined(_M_X64) || \
-                               defined(i386) || defined(_M_IX86))
+#if !defined(DISABLE_SIMD) && defined(__wasm_simd128__)
+// Wasm SIMD is enabled.
+// Define __SSE__ for the xmmintrin header and SIMD_WASM for simd_utils.cc
+#define __SSE__
+#define SIMD_WASM
+#include <wasm_simd128.h>
+// Needed for _mm_rsqrt_ps
+#include <xmmintrin.h>
+typedef v128_t SimdVector;
+#define SIMD_LENGTH 4
+#define SIMD_MULTIPLY(a, b) wasm_f32x4_mul(a, b)
+#define SIMD_ADD(a, b) wasm_f32x4_add(a, b)
+#define SIMD_SUB(a, b) wasm_f32x4_sub(a, b)
+#define SIMD_MULTIPLY_ADD(a, b, c) wasm_f32x4_add(wasm_f32x4_mul(a, b), c)
+#define SIMD_SQRT(a) wasm_f32x4_sqrt(a)
+#define SIMD_RECIPROCAL_SQRT(a) _mm_rsqrt_ps(a)
+#define SIMD_LOAD_ONE_FLOAT(p) wasm_f32x4_splat(p)
+#elif !defined(DISABLE_SIMD) && (defined(__x86_64__) || defined(_M_X64) || \
+                                 defined(i386) || defined(_M_IX86))
 // SSE1 is enabled.
 #include <xmmintrin.h>
 typedef __m128 SimdVector;
