@@ -21,6 +21,7 @@ cc_test(
     srcs = ["test_audio_element_types.c"],
     deps = [
         ":oar_test_common",
+        "//:oar",
     ],
 )
 
@@ -29,6 +30,7 @@ cc_test(
     srcs = ["test_channel_based_rendering.c"],
     deps = [
         ":oar_test_common",
+        "//:oar",
     ],
 )
 
@@ -45,6 +47,7 @@ cc_test(
     }),
     deps = [
         ":oar_test_common",
+        "//:oar",
     ],
 )
 
@@ -53,6 +56,7 @@ cc_test(
     srcs = ["test_object_based_rendering.c"],
     deps = [
         ":oar_test_common",
+        "//:oar",
     ],
 )
 
@@ -69,6 +73,7 @@ cc_test(
     srcs = ["test_metadata_unit_processing.c"],
     deps = [
         ":oar_test_common",
+        "//:oar",
     ],
 )
 
@@ -85,6 +90,7 @@ cc_test(
     srcs = ["test_peak_limiter_oar_api.c"],
     deps = [
         ":oar_test_common",
+        "//:oar",
     ],
 )
 
