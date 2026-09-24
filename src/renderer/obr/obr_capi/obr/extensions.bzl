@@ -5,11 +5,11 @@ def _pffft_ext_impl(mctx):
         name = "pffft",
         remote = "https://bitbucket.org/jpommier/pffft.git",
         commit = "0aec0327a6912e1a0ec5326eef737c2ce19bc836",
-        # Repository-qualified on purpose: a bare `//external:pffft.BUILD`
+        # Repository-qualified on purpose: a bare `//third_party:pffft.BUILD`
         # resolves against the main repository rather than against the module
         # this file belongs to, so it breaks as soon as obr is consumed as a
         # dependency instead of built on its own.
-        build_file = Label("@obr//external:pffft.BUILD"),
+        build_file = Label("@obr//third_party:pffft.BUILD"),
     )
 
 pffft_ext = module_extension(implementation = _pffft_ext_impl)

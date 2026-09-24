@@ -31,7 +31,7 @@ bazel build -c opt //obr/cli:obr_cli
 
 ### Dependencies
 
-Bazel dependencies are managed through both `MODULE.bazel` (bazelmod) and `WORKSPACE`. The project uses:
+Bazel dependencies are managed through `MODULE.bazel` (Bzlmod). The project uses:
 
 - [Abseil](https://abseil.io/) - C++ common libraries
 - [Eigen](https://eigen.tuxfamily.org/) - Linear algebra
