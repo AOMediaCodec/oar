@@ -1,6 +1,2 @@
-# Until we have migrated all deps out of WORKSPACE file, we need to continue to
-# use it. Starting with bazel 8, this flag flips to default false.
-common --enable_workspace
-
 # Toolchain flags shared with the parent oar build live in toolchain.bazelrc.
 import %workspace%/toolchain.bazelrc
