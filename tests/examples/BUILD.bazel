@@ -51,6 +51,18 @@ cc_test(
     ],
 )
 
+# Regression test for the ambisonics -> Sound System H LFE remap. It checks
+# the remap structure only (LFE slots excluded), so it does not depend on
+# OAR_ENABLE_HOA_LFE and runs in the default config.
+cc_test(
+    name = "test_hoa_sound_system_h",
+    srcs = ["test_hoa_sound_system_h.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
+
 cc_test(
     name = "test_object_based_rendering",
     srcs = ["test_object_based_rendering.c"],
