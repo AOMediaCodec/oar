@@ -23,6 +23,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "clog.h"
 #include "cqueue.h"
 #include "cvalue.h"
 #include "definitions.h"
@@ -110,6 +111,11 @@ static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
   if (metadata->type != ck_metadata_iamf_downmix_mode)
     return ck_oar_error_notsup;
 
+  /* The type is applicable to this renderer, but an invalid mode value is a
+   * caller error: report it (-EINVAL) instead of silently queuing it. */
+  if (!DMRenderer_valid_mix_mode(metadata->iamf_downmix_mode.mode))
+    return ck_oar_error_inval;
+
   metadata_copy = def_mallocz(oar_metadata_t, 1);
   if (!metadata_copy) return ck_oar_error_nomem;
   *metadata_copy = *metadata;
@@ -135,8 +141,12 @@ static int _render(renderer_library_context_t *ctx, const oar_audio_block_t *in,
       oar_metadata_t *metadata = 0;
       queue_pop(renderer->downmix_info, &v);
       metadata = (oar_metadata_t *)v.ptr;
-      DMRenderer_set_mode_weight(renderer->downmixer,
-                                 metadata->iamf_downmix_mode.mode, -1);
+      if (DMRenderer_set_mode_weight(
+              renderer->downmixer, metadata->iamf_downmix_mode.mode, -1) < 0) {
+        /* Defensive: mode values are validated at update time. */
+        warn("Invalid downmix mode %d ignored",
+             metadata->iamf_downmix_mode.mode);
+      }
       renderer->metadata_duration = metadata->duration;
       def_free(metadata);
     }

@@ -47,6 +47,14 @@ void _metadata_item_delete(metadata_item_t *metadata_item) {
 }
 
 // AudioElementContext related functions
+
+/* Classifies advisory metadata types (contract: see the @note in oar.h).
+ * Kept file-local: the classification is an implementation detail of the
+ * update forwarding below, not public API. */
+static int _metadata_is_advisory_type(oar_metadata_type_t type) {
+  return type == ck_metadata_iamf_downmix_mode;
+}
+
 int audio_element_context_init(audio_element_context_t *ctx, uint32_t id,
                                const oar_audio_element_config_t *config,
                                uint32_t sample_rate) {
@@ -105,6 +113,52 @@ void audio_element_context_delete(audio_element_context_t *ctx) {
   if (!ctx) return;
   audio_element_context_uninit(ctx);
   def_free(ctx);
+}
+
+void audio_element_context_ignore_advisory(audio_element_context_t *ctx,
+                                           const char *lib_id,
+                                           const oar_metadata_t *metadata) {
+  /* Rate-limited logging: warn only on the first ignored advisory type per
+   * element; subsequent ignores drop to debug to avoid per-frame log spam.
+   * Callers classify the type as advisory before reaching here; the guard
+   * below keeps a stray out-of-range type from indexing past the flags,
+   * which are sized by the type enum. A flag write is not atomic: a host
+   * pushing the same advisory type for one element from several threads
+   * may log the warning more than once, which is harmless. */
+  if (metadata->type <= ck_metadata_none || metadata->type >= ck_metadata_count)
+    return;
+
+  if (!ctx->ignored_advisory_types[metadata->type]) {
+    ctx->ignored_advisory_types[metadata->type] = 1;
+    warn(
+        "Element %u: renderer %s: advisory metadata type %d is not "
+        "applicable to the current rendering path; update ignored",
+        ctx->eid, lib_id ? lib_id : "unknown", (int)metadata->type);
+  } else {
+    debug("Element %u: renderer %s: advisory metadata type %d ignored",
+          ctx->eid, lib_id ? lib_id : "unknown", (int)metadata->type);
+  }
+}
+
+int audio_renderer_base_forward_metadata_update(
+    audio_renderer_base_t *base, audio_element_context_t *ctx, uint32_t index,
+    const oar_metadata_t *metadata) {
+  if (base->lib && base->lib->metadata_update) {
+    int ret = base->lib->metadata_update(&base->ctx, index, metadata);
+    if (ret != ck_oar_error_notsup ||
+        !_metadata_is_advisory_type(metadata->type))
+      return ret;
+    /* The renderer library has no consumer for this advisory type. */
+  } else if (!_metadata_is_advisory_type(metadata->type)) {
+    return ck_oar_error_notsup;
+  }
+
+  /* Advisory metadata is not applicable to the current rendering path (the
+   * library has no consumer for it, or consumes no metadata at all, e.g.
+   * EAR): accept and ignore it (NO-OP). */
+  audio_element_context_ignore_advisory(ctx, base->lib ? base->lib->id : 0,
+                                        metadata);
+  return ck_oar_ok;
 }
 
 int audio_element_context_update_gain(audio_element_context_t *ctx,

@@ -294,10 +294,9 @@ static int audio_element_renderer_update_metadata(
              self->config.type == ck_object_based) {
     return audio_element_context_update_object_positions(&self->element,
                                                          metadata);
-  } else if (self->base.lib && self->base.lib->metadata_update) {
-    return self->base.lib->metadata_update(&self->base.ctx, 0, metadata);
   }
-  return ck_oar_error_notsup;
+  return audio_renderer_base_forward_metadata_update(
+      &self->base, &self->element, 0, metadata);
 }
 
 int audio_element_renderer_update_data(audio_renderer_base_t *base, uint32_t id,

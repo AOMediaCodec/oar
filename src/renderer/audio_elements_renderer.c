@@ -325,9 +325,9 @@ int audio_elements_renderer_update_element_metadata(
   } else if (metadata->type == ck_metadata_object_positions &&
              (ctx->rid == ck_ri_id_oa_mono || ctx->rid == ck_ri_id_oa_dual)) {
     ret = audio_element_context_update_object_positions(ctx, metadata);
-  } else if (self->base.lib && self->base.lib->metadata_update) {
-    ret =
-        self->base.lib->metadata_update(&self->base.ctx, ctx->index, metadata);
+  } else {
+    ret = audio_renderer_base_forward_metadata_update(&self->base, ctx,
+                                                      ctx->index, metadata);
   }
 
   return ret;
