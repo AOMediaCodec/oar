@@ -238,7 +238,7 @@ static float _get_w(int w_idx) {
   return _widx2w_table[w_idx];
 }
 
-static int _valid_mix_mode(int mode) {
+int DMRenderer_valid_mix_mode(int mode) {
   return mode >= 0 && mode != 3 && mode < 7;
 }
 
@@ -249,7 +249,7 @@ static const MixFactors _mix_factors_mat[] = {
     {1.0, 0.866, 0.866, 0.866, 1},  {0, 0, 0, 0, 0}};
 
 static const MixFactors *_get_mix_factors(int mode) {
-  if (_valid_mix_mode(mode)) return &_mix_factors_mat[mode];
+  if (DMRenderer_valid_mix_mode(mode)) return &_mix_factors_mat[mode];
   return 0;
 }
 
@@ -302,7 +302,9 @@ DMRenderer *DMRenderer_open(dm_layout_t in, dm_layout_t out) {
 void DMRenderer_close(DMRenderer *self) { free(self); }
 
 int DMRenderer_set_mode_weight(DMRenderer *self, int mode, int w_idx) {
-  if (!self || !_valid_mix_mode(mode)) return -22;
+  // Returns ck_oar_error_inval (-22) as a literal to keep this module free of
+  // dependencies on the public OAR headers (standalone build).
+  if (!self || !DMRenderer_valid_mix_mode(mode)) return -22;
 
   if (self->mode != mode) {
     debug("dmixtypenum: %d -> %d", self->mode, mode);

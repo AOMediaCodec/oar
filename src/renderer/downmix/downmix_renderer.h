@@ -10,7 +10,6 @@
  * www.aomedia.org/license/patent.
  */
 
-
 /**
  * @file downmix_renderer.h
  * @brief DMRenderer APIs.
@@ -52,6 +51,13 @@ DMRenderer *DMRenderer_open(dm_layout_t in, dm_layout_t out);
  * @param     [in] self : the downmix renderer handle.
  */
 void DMRenderer_close(DMRenderer *self);
+
+/**
+ * @brief     Check whether a demix mode value is valid.
+ * @param     [in] mode : the demix mode.
+ * @return    non-zero if valid, zero if invalid.
+ */
+int DMRenderer_valid_mix_mode(int mode);
 
 /**
  * @brief     Set the demix mode and demix weight index for downmix renderer.

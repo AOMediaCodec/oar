@@ -201,8 +201,18 @@ int oar_remove_audio_element(oar_t *oar, uint32_t id);
  * @param     [in] oar : OAR object
  * @param     [in] id : Unique element id (searched across all groups)
  * @param     [in] metadata : Metadata to update
- * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
- *            parameters or non-existent ID
+ * @return    ck_oar_ok (0) on success. For advisory metadata types (see the
+ *            note below), success also covers "accepted but ignored": the
+ *            type is not applicable to the current rendering path.
+ *            ck_oar_error_inval (-22) for invalid parameters, a non-existent
+ *            ID, or an invalid value of an advisory metadata type when the
+ *            current rendering path has a consumer for it.
+ *            ck_oar_error_notsup (-95) for critical metadata types that the
+ *            element or its current rendering path does not support.
+ * @note      Advisory metadata types (currently only
+ *            ck_metadata_iamf_downmix_mode) are hints that take effect only
+ *            when the current rendering path has a consumer for them.
+ *            Returning ck_oar_ok means "accepted", not "took effect".
  */
 int oar_update_audio_element_metadata(oar_t *oar, uint32_t id,
                                       const oar_metadata_t *metadata);

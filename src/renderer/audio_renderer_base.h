@@ -56,6 +56,10 @@ typedef struct AudioElementContext {
   uint32_t channel_start_index;
   audio_rendering_metadata_t rendering_metadata;
 
+  // One ignore-report flag per advisory metadata type, sized by the type
+  // enum itself: a new metadata type needs no change here.
+  uint8_t ignored_advisory_types[ck_metadata_count];
+
 #ifdef __as_dbg__
   void *original;
 #endif
@@ -86,6 +90,21 @@ int audio_element_context_update_gain(audio_element_context_t *ctx,
 
 int audio_element_context_update_object_positions(
     audio_element_context_t *ctx, const oar_metadata_t *metadata);
+
+// Mark an advisory metadata update as ignored for this element and log it
+// (rate-limited: warn on first ignore per type, debug afterwards).
+void audio_element_context_ignore_advisory(audio_element_context_t *ctx,
+                                           const char *lib_id,
+                                           const oar_metadata_t *metadata);
+
+// Forward a metadata update to the renderer library. Advisory metadata
+// types (contract: see the @note in oar.h) that the library does not
+// consume are accepted and ignored (NO-OP, ck_oar_ok); other unsupported
+// types return ck_oar_error_notsup.
+int audio_renderer_base_forward_metadata_update(audio_renderer_base_t *base,
+                                                audio_element_context_t *ctx,
+                                                uint32_t index,
+                                                const oar_metadata_t *metadata);
 
 void metadata_item_elapse(metadata_item_t *item, uint32_t samples_per_channel);
 
