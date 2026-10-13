@@ -34,6 +34,12 @@ typedef struct AudioElementRenderer {
   audio_renderer_base_t base;  // Base class
   oar_audio_element_config_t config;
   audio_element_context_t element;
+  /* An object element's sub-frame input and output blocks, each sized at
+   * creation for a whole block of its channels, so a render does not
+   * allocate them. NULL for other element types. */
+  float *sub_in;
+  float *sub_out;
+  uint32_t sub_out_channels;
 #ifdef __as_dbg__
   void *rendered;
 #endif
@@ -51,6 +57,16 @@ static int _sub_frames_apply_positions(audio_element_renderer_t *renderer,
       !renderer->element.rendering_metadata.positions->metadatas)
     return ck_oar_error_inval;
 
+  /* The sub-blocks go into the storage sized at creation for a whole block
+   * of the element's channels and of the output's. Checked before the first
+   * position is passed to the library, so a block that cannot be rendered
+   * leaves the library's metadata unchanged. */
+  if (!renderer->sub_in || !renderer->sub_out ||
+      sub_frame_samples > renderer->base.block.samples_per_channel ||
+      block->channels > renderer->sub_out_channels) {
+    return ck_oar_error_inval;
+  }
+
   while (processed_samples < total_samples) {
     uint32_t current_unit_samples = sub_frame_samples;
     uint32_t remaining_samples = total_samples - processed_samples;
@@ -63,6 +79,7 @@ static int _sub_frames_apply_positions(audio_element_renderer_t *renderer,
       current_unit_samples = remaining_samples;
 
     // Find the current position metadata for this sample position
+    oar_metadata_t current_metadata_storage;
     oar_metadata_t *current_metadata = 0;
     for (int j = 0;
          j < queue_length(
@@ -79,8 +96,10 @@ static int _sub_frames_apply_positions(audio_element_renderer_t *renderer,
           sample_position < accumulated_duration + metadata->duration) {
         // Create a constant position metadata for this specific sample position
         uint32_t relative_pos = sample_position - accumulated_duration;
-        current_metadata = metadata_constant_polar_positions_create(
-            metadata, relative_pos, current_unit_samples);
+        metadata_constant_polar_positions_fill(&current_metadata_storage,
+                                               metadata, relative_pos,
+                                               current_unit_samples);
+        current_metadata = &current_metadata_storage;
         break;
       }
 
@@ -92,20 +111,12 @@ static int _sub_frames_apply_positions(audio_element_renderer_t *renderer,
       if (renderer->base.lib && renderer->base.lib->metadata_update)
         renderer->base.lib->metadata_update(&renderer->base.ctx, 0,
                                             current_metadata);
-      metadata_delete(current_metadata);
     }
 
-    // Create sub-block for this segment with proper memory allocation
     oar_audio_block_t sub_block;
     sub_block.channels = renderer->base.block.channels;
     sub_block.samples_per_channel = current_unit_samples;
-
-    // Allocate memory for sub-block data
-    sub_block.data =
-        def_malloc(float, sub_block.channels *sub_block.samples_per_channel);
-    if (!sub_block.data) {
-      return ck_oar_error_nomem;
-    }
+    sub_block.data = renderer->sub_in;
 
     // Copy data from original block in planar format with proper offset
     // alignment
@@ -120,18 +131,13 @@ static int _sub_frames_apply_positions(audio_element_renderer_t *renderer,
       memcpy(dst_channel, src_channel, current_unit_samples * sizeof(float));
     }
 
-    // Create output sub-block with proper memory allocation
     oar_audio_block_t sub_out_block;
     sub_out_block.channels = block->channels;
     sub_out_block.samples_per_channel = current_unit_samples;
-
-    // Allocate memory for output sub-block data
-    sub_out_block.data = def_mallocz(
-        float, sub_out_block.channels *sub_out_block.samples_per_channel);
-    if (!sub_out_block.data) {
-      def_free(sub_block.data);
-      return ck_oar_error_nomem;
-    }
+    sub_out_block.data = renderer->sub_out;
+    memset(sub_out_block.data, 0,
+           sub_out_block.channels * sub_out_block.samples_per_channel *
+               sizeof(float));
 
     // Render this sub-frame
     if (renderer->base.lib && renderer->base.lib->render) {
@@ -150,10 +156,6 @@ static int _sub_frames_apply_positions(audio_element_renderer_t *renderer,
         memcpy(dst_channel, src_channel, current_unit_samples * sizeof(float));
       }
     }
-
-    // Clean up allocated memory
-    def_free(sub_block.data);
-    def_free(sub_out_block.data);
 
     processed_samples += current_unit_samples;
   }
@@ -218,6 +220,18 @@ audio_element_renderer_t *audio_element_renderer_new(
     return 0;
   }
 
+  if (config->type == ck_object_based) {
+    self->sub_out_channels = layout_channels_count(oar_config->target_layout);
+    self->sub_in = def_malloc(float, self->base.block.channels *
+                                         self->base.block.samples_per_channel);
+    self->sub_out = def_malloc(
+        float, self->sub_out_channels * self->base.block.samples_per_channel);
+    if (!self->sub_in || !self->sub_out) {
+      audio_element_renderer_delete(&self->base);
+      return 0;
+    }
+  }
+
   if (audio_element_context_init(&self->element, id, config,
                                  ctx->sample_rate) != ck_oar_ok) {
     audio_element_renderer_delete(&self->base);
@@ -268,6 +282,8 @@ void audio_element_renderer_delete(audio_renderer_base_t *base) {
 
   audio_renderer_base_uninit(&self->base);
   audio_element_context_uninit(&self->element);
+  def_free(self->sub_in);
+  def_free(self->sub_out);
 
 #ifdef __as_dbg__
   if (self->rendered) wav_writer_close(self->rendered);
