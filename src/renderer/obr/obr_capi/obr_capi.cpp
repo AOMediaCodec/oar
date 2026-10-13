@@ -21,9 +21,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
-#include <string>
-#include <vector>
 
 #include "obr/renderer/obr_impl.h"
 using namespace obr;
@@ -83,30 +80,11 @@ int obr_add_audio_element(obr_handle handle, ObrAudioElementType type,
 
 int obr_process(obr_handle handle, const float *input, float *output,
                 int num_samples) {
-  int input_nch = 0;
-  int output_nch = 2;
-  size_t buffer_size = num_samples;
-
   if (!handle || !input || !output) return 0;
 
-  input_nch = (int)cast_(handle)->GetNumberOfInputChannels();
-
-  std::vector<std::vector<float>> input_buffer_float(
-      input_nch, std::vector<float>(buffer_size));
-
-  for (size_t ch = 0; ch < input_nch; ch++)
-    for (size_t smp = 0; smp < buffer_size; smp++)
-      input_buffer_float[ch][smp] = input[ch * buffer_size + smp];
-
-  AudioBuffer input_buffer(input_nch, buffer_size);
-  input_buffer = input_buffer_float;
-  AudioBuffer output_buffer(output_nch, buffer_size);
-
-  cast_(handle)->Process(input_buffer, &output_buffer);
-
-  for (size_t ch = 0; ch < output_buffer.num_channels(); ch++)
-    for (size_t smp = 0; smp < output_buffer.num_frames(); smp++)
-      output[ch * output_buffer.num_frames() + smp] = output_buffer[ch][smp];
+  // The renderer keeps the buffers it processes in and takes its lock once;
+  // this function keeps no buffers and takes no lock of its own.
+  cast_(handle)->ProcessPlanar(input, output, static_cast<size_t>(num_samples));
 
   return num_samples;
 }
