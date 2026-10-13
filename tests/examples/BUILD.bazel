@@ -96,3 +96,11 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_render_scratch",
+    srcs = ["test_render_scratch.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
