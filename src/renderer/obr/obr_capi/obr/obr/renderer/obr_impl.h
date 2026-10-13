@@ -52,6 +52,22 @@ class ObrImpl {
    */
   void Process(const AudioBuffer& input_buffer, AudioBuffer* output_buffer);
 
+  /*!\brief Processes audio held in flat planar arrays.
+   *
+   * Copies `input` into an input buffer the renderer keeps, processes it as
+   * `Process()` does, and copies the binaural result into `output`. The
+   * renderer sizes its buffers when an audio element is added or removed, so
+   * this call does not allocate. It takes the same lock as `Process()`, once.
+   *
+   * \param input `GetNumberOfInputChannels()` channels of `num_frames`
+   *        samples, one channel after the other.
+   * \param output Receives the two binaural channels of `num_frames` samples,
+   *        one channel after the other.
+   * \param num_frames Samples per channel; must equal
+   *        `GetBufferSizePerChannel()`.
+   */
+  void ProcessPlanar(const float* input, float* output, size_t num_frames);
+
   /*!\brief Returns the buffer size per channel.
    *
    * \return Buffer size per channel.
@@ -231,6 +247,16 @@ class ObrImpl {
    */
   size_t GetNumberOfInputChannelsLocked() const;
 
+  /*!\brief The body of `Process()`, run while holding mutex_.
+   */
+  void ProcessLocked(const AudioBuffer& input_buffer,
+                     AudioBuffer* output_buffer);
+
+  /*!\brief Sizes `planar_input_` for the current number of input channels.
+   * Must be called while holding mutex_.
+   */
+  void ResizePlanarInputLocked();
+
   const int buffer_size_per_channel_;
   const int sampling_rate_;
 
@@ -238,7 +264,9 @@ class ObrImpl {
   bool limiter_enabled_;
   WorldRotation world_rotation_;
 
-  // Mutex to protect data accessed in different threads.
+  // Mutex to protect data accessed in different threads, including the
+  // group output and planar buffers. `Process()` and `ProcessPlanar()` hold
+  // it for the whole call.
   mutable absl::Mutex mutex_;
 
   std::vector<AudioElementConfig> audio_elements_;
@@ -259,6 +287,12 @@ class ObrImpl {
   // Each processing group's binaural output in `Process()`, allocated in the
   // constructor so that processing does not allocate.
   AudioBuffer group_output_;
+
+  // The input and output of `ProcessPlanar()`. The input is sized for the
+  // input channels when an audio element is added or removed, the output in
+  // the constructor. Accessed under `mutex_`.
+  AudioBuffer planar_input_;
+  AudioBuffer planar_output_;
 };
 
 }  // namespace obr
