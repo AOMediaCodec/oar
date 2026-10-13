@@ -108,9 +108,7 @@ static void _audio_group_delete(audio_group_t *group) {
     if (group->renderers)
       vector_free(group->renderers,
                   def_default_free_ptr(audio_renderer_delete));
-    if (group->output_gain.metadatas)
-      queue_free(group->output_gain.metadatas,
-                 def_default_free_ptr(metadata_delete));
+    metadata_item_uninit(&group->output_gain);
     def_free(group);
   }
 }
@@ -237,6 +235,7 @@ int oar_add_audio_group(oar_t *oar) {
   audio_group_t *group = 0;
   value_wrap_t v;
   int gid;
+  int output_gain_ret;
 
   if (!oar) return ck_oar_error_inval;
 
@@ -255,7 +254,7 @@ int oar_add_audio_group(oar_t *oar) {
   group->id = gid;
   group->renderers = vector_new();
   group->loudness_gain = 1.0f;
-  group->output_gain.metadatas = queue_new();
+  output_gain_ret = metadata_item_init(&group->output_gain, gid);
 
   if (oar->config.target_layout == ck_oar_layout_binaural) {
     audio_renderer_base_t *binaural_renderer =
@@ -280,7 +279,7 @@ int oar_add_audio_group(oar_t *oar) {
     }
   }
 
-  if (!group->renderers || !group->output_gain.metadatas ||
+  if (!group->renderers || output_gain_ret != ck_oar_ok ||
       _reserve_render_scratch(oar, vector_size(oar->groups) + 1) != ck_oar_ok) {
     _audio_group_delete(group);
     return ck_oar_error_nomem;
@@ -489,7 +488,6 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
                         const oar_metadata_t *metadata) {
   audio_group_t *group = 0;
   value_wrap_t v;
-  oar_metadata_t *clone = 0;
 
   if (!oar || !metadata) return ck_oar_error_inval;
 
@@ -500,17 +498,8 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
   group = def_value_wrap_type_ptr(audio_group_t, &v);
 
   if (metadata->type == ck_metadata_gain) {
-    clone = metadata_clone(metadata);
-    if (!clone) return ck_oar_error_nomem;
-
-    if (group->output_gain.metadatas) {
-      if (queue_push(group->output_gain.metadatas,
-                     def_value_wrap_instance_ptr(clone)) < 0) {
-        metadata_delete(clone);
-        return ck_oar_error_nomem;
-      }
-      group->output_gain.duration += metadata->duration;
-    }
+    int ret = metadata_item_push(&group->output_gain, metadata);
+    if (ret != ck_oar_ok) return ret;
   } else if (metadata->type == ck_metadata_head_rotation) {
     // Store the head rotation in the OAR object
     oar->head_rotation = metadata->head_rotation;

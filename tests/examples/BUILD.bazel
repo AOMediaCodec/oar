@@ -144,3 +144,12 @@ cc_test(
         "//:oar",
     ],
 )
+
+cc_test(
+    name = "test_metadata_reuse",
+    srcs = ["test_metadata_reuse.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)

@@ -33,7 +33,25 @@ struct CQueue {
   node_t *front;
   node_t *rear;
   int count;
+  /* Nodes popped off the queue or reserved with queue_reserve(), reused by
+   * the next push. A queue whose length stays within the nodes it has held
+   * before does not allocate on push or free on pop. */
+  node_t *spare;
 };
+
+/* Takes a spare node, or allocates one when there is none. */
+static node_t *_node_get(queue_t *q) {
+  node_t *n = q->spare;
+  if (!n) return (node_t *)calloc(1, sizeof(node_t));
+  q->spare = n->next;
+  n->next = 0;
+  return n;
+}
+
+static void _node_put(queue_t *q, node_t *n) {
+  n->next = q->spare;
+  q->spare = n;
+}
 
 queue_t *queue_new() {
   queue_t *q = 0;
@@ -45,13 +63,32 @@ void queue_free(queue_t *q, func_value_wrap_ptr_free_t free_func) {
   value_wrap_t v;
   while (queue_pop(q, &v) == 0)
     if (free_func && v.ptr) free_func(v.ptr);
+  if (q) {
+    while (q->spare) {
+      node_t *n = q->spare;
+      q->spare = n->next;
+      free(n);
+    }
+  }
   free(q);
+}
+
+int queue_reserve(queue_t *q, int n) {
+  int spares = 0;
+  if (!q || n < 0) return -22;  // -EINVAL
+  for (node_t *s = q->spare; s; s = s->next) ++spares;
+  for (; spares < n; ++spares) {
+    node_t *node = (node_t *)calloc(1, sizeof(node_t));
+    if (!node) return -12;  // -ENOMEM
+    _node_put(q, node);
+  }
+  return 0;
 }
 
 int queue_push(queue_t *q, value_wrap_t v) {
   if (!q) return -22;  // -EINVAL
   node_t *n = 0;
-  n = (node_t *)calloc(1, sizeof(node_t));
+  n = _node_get(q);
   if (!n) return -12;  // -ENOMEM
   n->value = v;
   if (!q->rear)
@@ -75,7 +112,7 @@ int queue_pop(queue_t *q, value_wrap_t *v) {
   q->front = n->next;
   if (!q->front) q->rear = 0;
   --q->count;
-  free(n);
+  _node_put(q, n);
   return 0;
 }
 
@@ -115,7 +152,7 @@ int queue_custom_push(queue_t *q, value_wrap_t v, queue_custom_func_t cmp) {
       n = n->next;
       ++idx;
     } else {
-      n = (node_t *)calloc(1, sizeof(node_t));
+      n = _node_get(q);
       if (!n) return -12;  // -ENOMEM
       n->value = v;
       if (p) {

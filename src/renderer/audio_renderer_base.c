@@ -38,12 +38,80 @@ static int _find_metadata_item_id(value_wrap_t item, value_wrap_t key) {
 void _metadata_item_delete(metadata_item_t *metadata_item) {
   if (!metadata_item) return;
 
-  if (metadata_item->metadatas) {
-    queue_free(metadata_item->metadatas, def_default_free_ptr(metadata_delete));
-    metadata_item->metadatas = 0;
-  }
+  metadata_item_uninit(metadata_item);
 
   def_free(metadata_item);
+}
+
+static int _metadata_owns_gain_array(const oar_metadata_t *metadata) {
+  return metadata->type == ck_metadata_gain &&
+         metadata->gain.param_type == ck_param_multiple &&
+         metadata->gain.gain_array;
+}
+
+/* Keeps an elapsed copy for the next push, or frees it when the spares are
+ * full or it owns a gain array. */
+static void _metadata_item_recycle(metadata_item_t *item,
+                                   oar_metadata_t *metadata) {
+  if (item->spare_count < def_metadata_item_spares &&
+      !_metadata_owns_gain_array(metadata)) {
+    item->spares[item->spare_count++] = metadata;
+  } else {
+    metadata_delete(metadata);
+  }
+}
+
+int metadata_item_init(metadata_item_t *item, uint32_t id) {
+  if (!item) return ck_oar_error_inval;
+  memset(item, 0, sizeof(metadata_item_t));
+  item->id = id;
+
+  item->metadatas = queue_new();
+  if (!item->metadatas) return ck_oar_error_nomem;
+  if (queue_reserve(item->metadatas, def_metadata_item_spares) < 0)
+    return ck_oar_error_nomem;
+
+  while (item->spare_count < def_metadata_item_spares) {
+    oar_metadata_t *spare = def_mallocz(oar_metadata_t, 1);
+    if (!spare) return ck_oar_error_nomem;
+    item->spares[item->spare_count++] = spare;
+  }
+
+  return ck_oar_ok;
+}
+
+void metadata_item_uninit(metadata_item_t *item) {
+  if (!item) return;
+
+  if (item->metadatas) {
+    queue_free(item->metadatas, def_default_free_ptr(metadata_delete));
+    item->metadatas = 0;
+  }
+
+  for (int i = 0; i < item->spare_count; i++) def_free(item->spares[i]);
+  item->spare_count = 0;
+}
+
+int metadata_item_push(metadata_item_t *item, const oar_metadata_t *metadata) {
+  oar_metadata_t *copy = 0;
+
+  if (!item || !item->metadatas || !metadata) return ck_oar_error_inval;
+
+  if (item->spare_count > 0 && !_metadata_owns_gain_array(metadata)) {
+    copy = item->spares[--item->spare_count];
+    *copy = *metadata;
+  } else {
+    copy = metadata_clone(metadata);
+    if (!copy) return ck_oar_error_nomem;
+  }
+
+  if (queue_push(item->metadatas, def_value_wrap_instance_ptr(copy)) < 0) {
+    _metadata_item_recycle(item, copy);
+    return ck_oar_error_nomem;
+  }
+  item->duration += metadata->duration;
+
+  return ck_oar_ok;
 }
 
 // AudioElementContext related functions
@@ -71,8 +139,7 @@ int audio_element_context_init(audio_element_context_t *ctx, uint32_t id,
     ctx->rendering_metadata.positions = def_mallocz(metadata_item_t, 1);
     if (!ctx->rendering_metadata.positions) return ck_oar_error_nomem;
 
-    ctx->rendering_metadata.positions->metadatas = queue_new();
-    if (!ctx->rendering_metadata.positions->metadatas)
+    if (metadata_item_init(ctx->rendering_metadata.positions, id) != ck_oar_ok)
       return ck_oar_error_nomem;
   }
 
@@ -99,9 +166,8 @@ void audio_element_context_uninit(audio_element_context_t *ctx) {
     vector_free(ctx->rendering_metadata.gains,
                 def_default_free_ptr(_metadata_item_delete));
   if (ctx->rendering_metadata.positions) {
-    queue_free(ctx->rendering_metadata.positions->metadatas,
-               def_default_free_ptr(metadata_delete));
-    def_free(ctx->rendering_metadata.positions);
+    _metadata_item_delete(ctx->rendering_metadata.positions);
+    ctx->rendering_metadata.positions = 0;
   }
 
 #ifdef __as_dbg__
@@ -165,16 +231,13 @@ int audio_element_context_update_gain(audio_element_context_t *ctx,
                                       const oar_metadata_t *metadata) {
   value_wrap_t v;
   metadata_item_t *gain = 0;
-  oar_metadata_t *clone = 0;
   if (vector_find(ctx->rendering_metadata.gains,
                   def_value_wrap_instance_u32(metadata->gain.id),
                   _find_metadata_item_id, &v) < 0) {
     metadata_item_t *item = def_mallocz(metadata_item_t, 1);
     if (!item) return ck_oar_error_nomem;
-    item->id = metadata->gain.id;
-    item->metadatas = queue_new();
-    if (!item->metadatas) {
-      def_free(item);
+    if (metadata_item_init(item, metadata->gain.id) != ck_oar_ok) {
+      _metadata_item_delete(item);
       return ck_oar_error_nomem;
     }
     gain = item;
@@ -184,29 +247,15 @@ int audio_element_context_update_gain(audio_element_context_t *ctx,
     gain = def_value_wrap_type_ptr(metadata_item_t, &v);
   }
 
-  clone = metadata_clone(metadata);
-  if (!clone) return ck_oar_error_nomem;
-  queue_push(gain->metadatas, def_value_wrap_instance_ptr(clone));
-  gain->duration += metadata->duration;
-
-  return ck_oar_ok;
+  return metadata_item_push(gain, metadata);
 }
 
 int audio_element_context_update_object_positions(
     audio_element_context_t *ctx, const oar_metadata_t *metadata) {
-  oar_metadata_t *clone = 0;
-
   if (!ctx || !metadata || metadata->type != ck_metadata_object_positions)
     return ck_oar_error_inval;
 
-  clone = metadata_clone(metadata);
-  if (!clone) return ck_oar_error_nomem;
-
-  queue_push(ctx->rendering_metadata.positions->metadatas,
-             def_value_wrap_instance_ptr(clone));
-  ctx->rendering_metadata.positions->duration += metadata->duration;
-
-  return ck_oar_ok;
+  return metadata_item_push(ctx->rendering_metadata.positions, metadata);
 }
 
 void metadata_item_elapse(metadata_item_t *item, uint32_t samples_per_channel) {
@@ -231,7 +280,7 @@ void metadata_item_elapse(metadata_item_t *item, uint32_t samples_per_channel) {
       item->start -= metadata->duration;
       item->duration -= metadata->duration;
       queue_pop(metadatas, &v);
-      metadata_delete(metadata);
+      _metadata_item_recycle(item, metadata);
     } else
       break;
   }
