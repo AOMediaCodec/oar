@@ -122,3 +122,12 @@ cc_test(
         "//:oar",
     ],
 )
+
+cc_test(
+    name = "test_binaural_add_remove",
+    srcs = ["test_binaural_add_remove.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
