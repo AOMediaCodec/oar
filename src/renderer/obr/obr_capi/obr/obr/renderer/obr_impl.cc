@@ -12,6 +12,7 @@
 
 #include "obr/renderer/obr_impl.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -42,7 +43,9 @@ ObrImpl::ObrImpl(int buffer_size_per_channel, int sampling_rate)
       limiter_enabled_(true),
       world_rotation_(WorldRotation()),
       fft_manager_(buffer_size_per_channel_),
-      group_output_(kNumBinauralChannels, buffer_size_per_channel_) {
+      group_output_(kNumBinauralChannels, buffer_size_per_channel_),
+      planar_input_(0, buffer_size_per_channel_),
+      planar_output_(kNumBinauralChannels, buffer_size_per_channel_) {
   ABSL_CHECK_GT(buffer_size_per_channel, 0)
       << "Buffer size per channel must be greater than 0.";
   ABSL_CHECK_GT(sampling_rate_, 0) << "Sampling rate must be greater than 0.";
@@ -147,7 +150,35 @@ void ObrImpl::Process(const AudioBuffer& input_buffer,
 
   // Acquire the lock for the entire processing duration.
   absl::MutexLock lock(&mutex_);
+  ProcessLocked(input_buffer, output_buffer);
+}
 
+void ObrImpl::ProcessPlanar(const float* input, float* output,
+                            size_t num_frames) {
+  ABSL_CHECK_NE(input, nullptr);
+  ABSL_CHECK_NE(output, nullptr);
+  ABSL_CHECK_EQ(num_frames, buffer_size_per_channel_);
+
+  absl::MutexLock lock(&mutex_);
+
+  // `AddAudioElement()` and `RemoveLastAudioElement()` size the input buffer
+  // for the input channels in the same critical section that changes them.
+  ABSL_CHECK_EQ(planar_input_.num_channels(), GetNumberOfInputChannelsLocked());
+
+  for (size_t ch = 0; ch < planar_input_.num_channels(); ++ch) {
+    std::copy_n(input + ch * num_frames, num_frames, planar_input_[ch].begin());
+  }
+
+  ProcessLocked(planar_input_, &planar_output_);
+
+  for (size_t ch = 0; ch < planar_output_.num_channels(); ++ch) {
+    std::copy_n(planar_output_[ch].begin(), num_frames,
+                output + ch * num_frames);
+  }
+}
+
+void ObrImpl::ProcessLocked(const AudioBuffer& input_buffer,
+                            AudioBuffer* output_buffer) {
   // Clear the output buffer.
   output_buffer->Clear();
 
@@ -244,6 +275,13 @@ size_t ObrImpl::GetNumberOfInputChannelsLocked() const {
   return number_of_input_channels;
 }
 
+void ObrImpl::ResizePlanarInputLocked() {
+  const size_t num_channels = GetNumberOfInputChannelsLocked();
+  if (planar_input_.num_channels() != num_channels) {
+    planar_input_ = AudioBuffer(num_channels, buffer_size_per_channel_);
+  }
+}
+
 size_t ObrImpl::GetNumberOfInputChannels() {
   absl::MutexLock lock(&mutex_);
   return GetNumberOfInputChannelsLocked();
@@ -289,6 +327,7 @@ absl::Status ObrImpl::AddAudioElement(const AudioElementType type,
 
     // All checks passed, add the Audio Element config.
     audio_elements_.push_back(audio_element_config);
+    ResizePlanarInputLocked();
     ABSL_LOG(INFO) << "Added audio element: "
                    << GetAudioElementTypeStr(audio_elements_.back().GetType())
                    << ".";
@@ -316,6 +355,7 @@ absl::Status ObrImpl::RemoveLastAudioElement() {
                    << GetAudioElementTypeStr(audio_elements_.back().GetType())
                    << ".";
     audio_elements_.pop_back();
+    ResizePlanarInputLocked();
 
     if (audio_elements_.empty()) {
       ABSL_LOG(INFO) << "No audio elements left.";
