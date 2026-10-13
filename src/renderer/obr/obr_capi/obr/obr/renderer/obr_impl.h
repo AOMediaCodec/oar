@@ -13,6 +13,7 @@
 #ifndef OBR_RENDERER_OBR_IMPL_H_
 #define OBR_RENDERER_OBR_IMPL_H_
 
+#include <atomic>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -23,6 +24,7 @@
 #include "obr/ambisonic_binaural_decoder/fft_manager.h"
 #include "obr/ambisonic_binaural_decoder/resampler.h"
 #include "obr/audio_buffer/audio_buffer.h"
+#include "obr/common/atomic_rotation.h"
 #include "obr/common/misc_math.h"
 #include "obr/peak_limiter/peak_limiter.h"
 #include "obr/renderer/audio_element_config.h"
@@ -151,6 +153,9 @@ class ObrImpl {
 
   /*! \brief Enables or disables head tracking.
    *
+   * Takes no lock, so it can be called from any thread while `Process()`
+   * runs; the change takes effect at the next `Process()` call.
+   *
    * \param enable_head_tracking True to enable head tracking, false to disable.
    */
   void EnableHeadTracking(bool enable_head_tracking);
@@ -189,6 +194,9 @@ class ObrImpl {
 
   /*! \brief Enables or disables the output peak limiter.
    *
+   * Takes no lock, so it can be called from any thread while `Process()`
+   * runs; the change takes effect at the next `Process()` call.
+   *
    * \param enable_limiter True to enable the limiter (default), false to
    * disable.
    */
@@ -202,6 +210,12 @@ class ObrImpl {
    * X - right (positive right, negative left)
    * Y - front (positive front, negative back)
    * Z - up (positive up, negative down)
+   *
+   * Takes no lock, so it can be called from any thread, such as a sensor
+   * thread, while `Process()` runs; the rotation takes effect at the next
+   * `Process()` call. If a call overlaps the rotation's read at the start of
+   * `Process()` every time it retries, that block keeps the previous block's
+   * rotation.
    *
    * @param w
    * @param x
@@ -264,13 +278,20 @@ class ObrImpl {
   const int buffer_size_per_channel_;
   const int sampling_rate_;
 
-  bool head_tracking_enabled_;
-  bool limiter_enabled_;
-  WorldRotation world_rotation_;
+  // Control state set from any thread without `mutex_`. `Process()` reads
+  // each once per call, so a change takes effect at the next block.
+  std::atomic<bool> head_tracking_enabled_;
+  std::atomic<bool> limiter_enabled_;
+  AtomicWorldRotation world_rotation_;
 
-  // Mutex to protect data accessed in different threads, including the
-  // group output and planar buffers. `Process()` and `ProcessPlanar()` hold
-  // it for the whole call.
+  // The rotation `Process()` read for its last block, which it keeps when a
+  // read of `world_rotation_` overlaps a write. Accessed under `mutex_`.
+  WorldRotation latched_world_rotation_;
+
+  // Guards the audio elements and processing groups, the planar input and
+  // output buffers, the group output buffer, the peak limiter and
+  // `latched_world_rotation_`. `Process()` and `ProcessPlanar()` hold it for
+  // the whole call; the control state above does not use it.
   mutable absl::Mutex mutex_;
 
   std::vector<AudioElementConfig> audio_elements_;

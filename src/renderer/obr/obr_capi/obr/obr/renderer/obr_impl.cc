@@ -13,6 +13,7 @@
 #include "obr/renderer/obr_impl.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -41,7 +42,6 @@ ObrImpl::ObrImpl(int buffer_size_per_channel, int sampling_rate)
       sampling_rate_(sampling_rate),
       head_tracking_enabled_(false),
       limiter_enabled_(true),
-      world_rotation_(WorldRotation()),
       fft_manager_(buffer_size_per_channel_),
       group_output_(kNumBinauralChannels, buffer_size_per_channel_),
       planar_input_(0, buffer_size_per_channel_),
@@ -179,6 +179,13 @@ void ObrImpl::ProcessPlanar(const float* input, float* output,
 
 void ObrImpl::ProcessLocked(const AudioBuffer& input_buffer,
                             AudioBuffer* output_buffer) {
+  // Read the control state once for the whole block; other threads set it
+  // without the lock.
+  const bool head_tracking_enabled =
+      head_tracking_enabled_.load(std::memory_order_relaxed);
+  const bool limiter_enabled = limiter_enabled_.load(std::memory_order_relaxed);
+  latched_world_rotation_ = world_rotation_.Load(latched_world_rotation_);
+
   // Clear the output buffer.
   output_buffer->Clear();
 
@@ -229,7 +236,7 @@ void ObrImpl::ProcessLocked(const AudioBuffer& input_buffer,
   // (May still have passthrough elements processed above.)
   if (processing_groups_.empty()) {
     // Apply peak limiter even for passthrough-only configurations.
-    if (limiter_enabled_) {
+    if (limiter_enabled) {
       peak_limiter_->Process(*output_buffer, output_buffer);
     }
     return;
@@ -238,8 +245,8 @@ void ObrImpl::ProcessLocked(const AudioBuffer& input_buffer,
   // Process each processing group.
   for (auto& group : processing_groups_) {
     group_output_.Clear();
-    group.Process(input_buffer, audio_elements_, head_tracking_enabled_,
-                  world_rotation_, &group_output_);
+    group.Process(input_buffer, audio_elements_, head_tracking_enabled,
+                  latched_world_rotation_, &group_output_);
 
     // Add this group's binaural output to the main output buffer.
     (*output_buffer)[0] += group_output_[0];
@@ -247,7 +254,7 @@ void ObrImpl::ProcessLocked(const AudioBuffer& input_buffer,
   }
 
   // Peak limit the output if enabled.
-  if (limiter_enabled_) {
+  if (limiter_enabled) {
     peak_limiter_->Process(*output_buffer, output_buffer);
   }
 }
@@ -460,26 +467,20 @@ absl::Status ObrImpl::UpdateObjectChannelPosition(size_t audio_element_index,
 }
 
 void ObrImpl::EnableHeadTracking(bool enable_head_tracking) {
-  // Acquire mutex: `head_tracking_enabled_` is read by `Process()` on the
-  // audio thread.
-  absl::MutexLock lock(&mutex_);
-  head_tracking_enabled_ = enable_head_tracking;
+  // No lock: `Process()` reads the flag once per block on the audio thread.
+  head_tracking_enabled_.store(enable_head_tracking, std::memory_order_relaxed);
 }
 
 void ObrImpl::EnableLimiter(bool enable_limiter) {
-  // Acquire mutex: `limiter_enabled_` is read by `Process()` on the audio
-  // thread.
-  absl::MutexLock lock(&mutex_);
-  limiter_enabled_ = enable_limiter;
+  // No lock: `Process()` reads the flag once per block on the audio thread.
+  limiter_enabled_.store(enable_limiter, std::memory_order_relaxed);
 }
 
 absl::Status ObrImpl::SetHeadRotation(float w, float x, float y, float z) {
-  // Acquire mutex: `world_rotation_` is read by `Process()` on the audio
-  // thread, and head rotation updates typically arrive from a sensor thread.
-  absl::MutexLock lock(&mutex_);
-
+  // No lock: head rotation typically arrives from a sensor thread on every
+  // block, and `Process()` reads it once per block on the audio thread.
   // Apply counter-rotation for head tracking.
-  world_rotation_ = WorldRotation(w, -x, -y, -z);
+  world_rotation_.Store(WorldRotation(w, -x, -y, -z));
 
   return absl::OkStatus();
 }
