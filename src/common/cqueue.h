@@ -28,6 +28,14 @@ typedef int (*queue_custom_func_t)(value_wrap_t, value_wrap_t);
 
 queue_t *queue_new();
 void queue_free(queue_t *, func_value_wrap_ptr_free_t);
+/**
+ * @brief Keeps at least n spare nodes, so that the next n pushes do not
+ *        allocate. Popped nodes become spares too.
+ *
+ * @return 0 on success, -12 when an allocation fails, -22 for invalid
+ *         arguments.
+ */
+int queue_reserve(queue_t *, int n);
 int queue_push(queue_t *, value_wrap_t);
 int queue_pop(queue_t *q, value_wrap_t *v);
 value_wrap_t *queue_at(queue_t *, int);
