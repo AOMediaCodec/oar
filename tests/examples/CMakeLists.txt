@@ -32,6 +32,13 @@ oar_add_test(test_object_based_rendering)
 oar_add_test(test_metadata_unit_processing)
 oar_add_test(test_remove_audio_element)
 oar_add_test(test_peak_limiter_oar_api)
+oar_add_test(test_object_position_gap)
+oar_add_test(test_olr_render_offsets)
+# Calls the object audio renderer directly, through its internal header.
+target_include_directories(test_olr_render_offsets PRIVATE
+  ${PROJECT_SOURCE_DIR}/src/renderer/olr/object_audio_renderer
+  ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_SOURCE_DIR}/src/common)
 
 # The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
 # into the library when OAR_ENABLE_HOA_LFE is ON.
