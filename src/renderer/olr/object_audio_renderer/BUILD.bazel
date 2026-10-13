@@ -8,6 +8,11 @@ cc_library(
         "object_based_audio_renderer.h",
     ],
     strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    # test_olr_render_offsets calls the object audio renderer directly.
+    visibility = [
+        "//src:__subpackages__",
+        "//tests/examples:__pkg__",
+    ],
     deps = [
         "//src:oar_config",
     ],

@@ -48,22 +48,27 @@ static int _processing_block_init(processing_block_t *self,
   return 0;
 }
 
-static int _processing_block_overlap(processing_block_t *self, int start_sample,
-                                     int num_samples, slice_t *states,
-                                     slice_t *samples) {
-  int end_sample = start_sample + num_samples;
-  int overlay_start_sample = def_max(start_sample, self->first_sample);
-  int overlay_end_sample = def_min(end_sample, self->last_sample);
+/* The overlap of a render call of num_samples samples at start_sample with
+ * the block, as sample offsets into the call (samples) and into the block
+ * (states). Sample positions are 64-bit; only the offsets, which are below
+ * num_samples, are narrowed to int. */
+static int _processing_block_overlap(processing_block_t *self,
+                                     uint64_t start_sample, int num_samples,
+                                     slice_t *states, slice_t *samples) {
+  const uint64_t end_sample = start_sample + (uint64_t)num_samples;
+  const uint64_t overlay_start_sample =
+      def_max(start_sample, self->first_sample);
+  const uint64_t overlay_end_sample = def_min(end_sample, self->last_sample);
 
   if (overlay_start_sample < overlay_end_sample) {
     if (samples) {
-      samples->s = overlay_start_sample - start_sample;
-      samples->e = overlay_end_sample - start_sample;
+      samples->s = (int)(overlay_start_sample - start_sample);
+      samples->e = (int)(overlay_end_sample - start_sample);
     }
 
     if (states) {
-      states->s = overlay_start_sample - self->first_sample;
-      states->e = overlay_end_sample - self->first_sample;
+      states->s = (int)(overlay_start_sample - self->first_sample);
+      states->e = (int)(overlay_end_sample - self->first_sample);
     }
   }
   return 0;

@@ -107,9 +107,12 @@ int block_processing_channel_process(block_processing_channel_t* self,
                               num_samples, channels, output);
 
     if (processing_block->last_sample < end_sample) {
+      /* The block ends inside this call; the next one must not start
+       * before it ends. */
+      const uint64_t next_start = processing_block->last_sample;
       deque_pop_front(self->processing_queue, &v);
       processing_block->destroy(processing_block);
-      _refil_processing_queue(self, sample_rate, -1);
+      _refil_processing_queue(self, sample_rate, next_start);
     } else if (processing_block->last_sample == end_sample) {
       deque_pop_front(self->processing_queue, &v);
       processing_block->destroy(processing_block);
@@ -151,9 +154,10 @@ static int _refil_processing_queue(block_processing_channel_t* self,
     if (!processing_block) continue;
     if (processing_block->first_sample < start) {
       error(
-          "metadata underrun: metadata arrived %u after the samples that it "
-          "would apply to %lu",
-          processing_block->first_sample, start);
+          "metadata underrun: metadata starting at sample %llu arrived after "
+          "sample %llu",
+          (unsigned long long)processing_block->first_sample,
+          (unsigned long long)start);
       processing_block->destroy(processing_block);
       return -22;
     }

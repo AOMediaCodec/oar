@@ -117,3 +117,21 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_object_position_gap",
+    srcs = ["test_object_position_gap.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
+
+cc_test(
+    name = "test_olr_render_offsets",
+    srcs = ["test_olr_render_offsets.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+        "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
+    ],
+)
