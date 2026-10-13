@@ -64,6 +64,9 @@ class AmbisonicEncoder {
 
   /*!\brief Processing callback for planar audio data (AudioBuffer).
    *
+   * The output is written in place frame by frame, so `output_buffer` must
+   * not be `input_buffer`.
+   *
    * \param input_buffer Input buffer of samples.
    * \param output_buffer Output buffer of processed samples.
    */
@@ -137,6 +140,16 @@ class AmbisonicEncoder {
 
   AssociatedLegendrePolynomialsGenerator alp_generator_;
   Eigen::MatrixXf encoding_matrix_;
+
+  // Working storage of `ProcessPlanarAudioData()` and `GetShCoeffs()`, sized
+  // in the constructor so that processing does not allocate.
+  std::vector<float> associated_legendre_polynomials_;
+  std::vector<float> sh_coeffs_;
+  std::vector<Eigen::VectorXf> column_start_;
+  std::vector<Eigen::VectorXf> column_end_;
+  std::vector<bool> needs_interpolation_;
+  Eigen::MatrixXf encoding_frame_;
+  Eigen::VectorXf interpolated_column_;
 };
 
 }  // namespace obr
