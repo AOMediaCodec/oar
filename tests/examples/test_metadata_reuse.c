@@ -20,10 +20,11 @@
  * the spares copies into a new allocation, and a copy that owns a gain array
  * (ck_param_multiple) is freed rather than kept.
  *
- * Every case renders the same input through two oar_t instances that receive
- * the same metadata at different times, and requires bit-identical output.
- * One stereo channel-based element and one one-object element render to
- * stereo with the limiter disabled.
+ * TC1 to TC3 render the same input through two oar_t instances that receive
+ * the same metadata at different times, and require bit-identical output.
+ * TC4 and TC5 render blocks after a single push and check what OAR writes to
+ * stderr. One stereo channel-based element and one one-object element render
+ * to stereo with the limiter disabled.
  *
  * Test matrix:
  *   TC1: Element gains, group gains and object positions pushed eight blocks
@@ -33,6 +34,11 @@
  *        gains, pushed three blocks ahead, render as when pushed just in time.
  *   TC3: A zero-duration gain and position pushed before the first block
  *        leave the output unchanged.
+ *   TC4: Blocks rendered after only a zero-duration gain and position render
+ *        as without them, and log no metadata warning: a zero-duration block
+ *        covers no samples, like an empty queue.
+ *   TC5: A block rendered after gains and a position that cover half of it
+ *        logs the metadata warning.
  */
 
 #include <stdint.h>
@@ -43,6 +49,16 @@
 #include "oar.h"
 #include "test_framework.h"
 #include "test_helpers.h"
+
+#ifdef _WIN32
+#include <io.h>
+#define dup _dup
+#define dup2 _dup2
+#define fileno _fileno
+#define close _close
+#else
+#include <unistd.h>
+#endif
 
 #define BLOCK 256
 #define BLOCKS 8
@@ -206,11 +222,87 @@ static int test_zero_duration(void) {
   return TEST_PASS;
 }
 
+/* Renders BLOCKS blocks into out[BLOCKS][2 * BLOCK]. With `prime`, block 0's
+ * metadata is pushed once before them, covering `prime_duration` samples; no
+ * other metadata is pushed. */
+static int render_after_prime(int prime, uint32_t prime_duration, float *out) {
+  oar_t *oar = create_oar();
+  if (!oar) return -1;
+  int ret = 0;
+  if (prime && push_metadata(oar, 0, 0, prime_duration) != 0) ret = -1;
+  for (int b = 0; ret == 0 && b < BLOCKS; b++)
+    ret = feed_and_render(oar, b, out + b * 2 * BLOCK);
+  oar_destroy(oar);
+  return ret;
+}
+
+/* Runs render_after_prime() with stderr redirected to a temporary file and
+ * stores what it wrote in `captured` (at most size - 1 bytes, terminated).
+ * Returns -1 if the redirect or the render fails. */
+static int render_capturing_stderr(int prime, uint32_t prime_duration,
+                                   float *out, char *captured, size_t size) {
+  int ret = -1;
+  captured[0] = '\0';
+  FILE *capture = tmpfile();
+  if (!capture) return -1;
+  fflush(stderr);
+  const int saved = dup(fileno(stderr));
+  if (saved >= 0) {
+    if (dup2(fileno(capture), fileno(stderr)) >= 0) {
+      ret = render_after_prime(prime, prime_duration, out);
+      fflush(stderr);
+      if (dup2(saved, fileno(stderr)) < 0) ret = -1;
+    }
+    close(saved);
+  }
+  rewind(capture);
+  const size_t n = fread(captured, 1, size - 1, capture);
+  captured[n] = '\0';
+  fclose(capture);
+  if (n > 0) fprintf(stderr, "%s", captured);
+  return ret;
+}
+
+/* TC4: zero-duration metadata, with nothing pushed after it, changes no
+ * output and logs no metadata warning. */
+static int test_zero_duration_alone(void) {
+  char captured[4096];
+  TEST_START("TC4: zero-duration metadata with no later metadata");
+  TEST_ASSERT(render_after_prime(0, 0, g_expected) == 0, "reference failed");
+  TEST_ASSERT(is_output_non_silent(g_expected, BLOCKS * 2 * BLOCK),
+              "reference output is silent");
+  TEST_ASSERT(
+      render_capturing_stderr(1, 0, g_got, captured, sizeof(captured)) == 0,
+      "render or stderr capture failed");
+  TEST_ASSERT(compare(g_got, g_expected) == 0,
+              "zero-duration metadata changed the output");
+  TEST_ASSERT(strstr(captured, "negative duration") == NULL,
+              "a zero-duration block logged a metadata warning");
+  return TEST_PASS;
+}
+
+/* TC5: metadata that covers half of the first block logs the warning, so
+ * TC4 does not pass because the warning or its capture is missing. */
+static int test_partial_cover_warns(void) {
+  char captured[4096];
+  TEST_START("TC5: metadata covering half a block");
+  TEST_ASSERT(render_capturing_stderr(1, BLOCK / 2, g_got, captured,
+                                      sizeof(captured)) == 0,
+              "render or stderr capture failed");
+  TEST_ASSERT(strstr(captured, "negative duration") != NULL,
+              "metadata covering half a block logged no warning");
+  return TEST_PASS;
+}
+
 static test_entry_t g_tests[] = {
     TEST_ENTRY("TC1", "metadata pushed eight blocks ahead", test_pushed_ahead),
     TEST_ENTRY("TC2", "per-sample gain arrays pushed ahead", test_gain_arrays),
     TEST_ENTRY("TC3", "zero-duration metadata before the first block",
                test_zero_duration),
+    TEST_ENTRY("TC4", "zero-duration metadata with no later metadata",
+               test_zero_duration_alone),
+    TEST_ENTRY("TC5", "metadata covering half a block",
+               test_partial_cover_warns),
 };
 
 int main(int argc, char *argv[]) {
