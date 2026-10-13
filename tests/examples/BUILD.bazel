@@ -113,3 +113,12 @@ cc_test(
         "//:oar",
     ],
 )
+
+cc_test(
+    name = "test_olr_block_storage",
+    srcs = ["test_olr_block_storage.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)

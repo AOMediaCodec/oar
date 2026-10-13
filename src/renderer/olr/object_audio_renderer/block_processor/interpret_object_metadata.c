@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "definitions.h"
 #include "gain_calculator/gain_calculator.h"
@@ -24,18 +25,34 @@
 struct InterpretObjectMetadata {
   layout_gain_calculator_t *gain_calculator;
   uint64_t last_block_end;
+  /* The gains of the last two blocks, in two arrays allocated at creation
+   * that swap roles: process() calculates the next gains into the older
+   * array. The previous block used that array as its start gains, and the
+   * caller has dropped the previous block before it calls process(). */
   auto_float_t *last_block_gains_from;
   auto_float_t *last_block_gains_to;
+  int num_gains;
+  /* Holds the block process() returns. */
+  processing_block_storage_t *storage;
 };
 
 interpret_object_metadata_t *interpret_object_metadata_create(
-    layout_gain_calculator_t *gain_calculator) {
+    layout_gain_calculator_t *gain_calculator, uint64_t max_block_samples) {
   interpret_object_metadata_t *self =
       def_mallocz(interpret_object_metadata_t, 1);
   if (!self) return 0;
 
   self->gain_calculator = gain_calculator;
   self->last_block_end = UINT64_MAX;
+  self->num_gains = gain_calculator->get_gains_count(gain_calculator);
+  self->last_block_gains_from = def_mallocz(auto_float_t, self->num_gains);
+  self->last_block_gains_to = def_mallocz(auto_float_t, self->num_gains);
+  self->storage = processing_block_storage_create(max_block_samples);
+  if (!self->last_block_gains_from || !self->last_block_gains_to ||
+      !self->storage) {
+    interpret_object_metadata_destroy(self);
+    return 0;
+  }
   return self;
 }
 
@@ -60,8 +77,9 @@ processing_block_t *interpret_object_metadata_process(
 
   if (target_sample > end_sample) target_sample = end_sample;
 
-  interp_to = def_mallocz(auto_float_t, n);
-  if (!interp_to) return 0;
+  if (n != self->num_gains) return 0;
+  interp_to = self->last_block_gains_from;
+  memset(interp_to, 0, sizeof(auto_float_t) * n);
 
   if (self->last_block_end != UINT64_MAX &&
       start_sample == self->last_block_end) {
@@ -83,22 +101,24 @@ processing_block_t *interpret_object_metadata_process(
 #endif
 
   self->last_block_end = end_sample;
-  if (self->last_block_gains_from) free(self->last_block_gains_from);
   self->last_block_gains_from = self->last_block_gains_to;
   self->last_block_gains_to = interp_to;
 
   if (start_sample != target_sample) {
-    return interp_gains_create(start_sample, target_sample, interp_from,
-                               interp_to, n);
+    return interp_gains_init(self->storage, start_sample, target_sample,
+                             interp_from, interp_to, n);
   } else if (target_sample != end_sample) {
-    return fixed_gains_create(target_sample, end_sample, interp_to, n);
+    return fixed_gains_init(self->storage, target_sample, end_sample, interp_to,
+                            n);
   }
 
   return 0;
 }
 
 void interpret_object_metadata_destroy(interpret_object_metadata_t *self) {
+  if (!self) return;
   if (self->last_block_gains_from) free(self->last_block_gains_from);
   if (self->last_block_gains_to) free(self->last_block_gains_to);
+  processing_block_storage_destroy(self->storage);
   free(self);
 }

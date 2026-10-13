@@ -32,7 +32,11 @@ struct RendererImpl {
   layout_gain_calculator_t *gain_calculator;
   int sample_rate;
   int output_channels;  // number of channels in the output buffer
+  int max_block_samples;
   vector_t *processors;
+  /* One channel's rendered output, output_channels * max_block_samples
+   * values. */
+  float *channel_out;
 };
 
 static void __destroy_processing_channel(processing_channel_t *processor);
@@ -40,7 +44,7 @@ static processing_channel_t *__find_processing_channel(vector_t *processors,
                                                        int id);
 
 renderer_impl_t *renderer_impl_create(layout_gain_calculator_t *gain_calculator,
-                                      int sample_rate) {
+                                      int sample_rate, int max_block_samples) {
   renderer_impl_t *impl = def_mallocz(renderer_impl_t, 1);
 
   if (!impl) return 0;
@@ -48,9 +52,13 @@ renderer_impl_t *renderer_impl_create(layout_gain_calculator_t *gain_calculator,
   impl->gain_calculator = gain_calculator;
   impl->sample_rate = sample_rate;
   impl->output_channels = gain_calculator->get_gains_count(gain_calculator);
+  impl->max_block_samples = max_block_samples;
 
   impl->processors = vector_new();
-  if (!impl->processors) {
+  const int channel_out_size = impl->output_channels * max_block_samples;
+  if (channel_out_size > 0)
+    impl->channel_out = def_malloc(float, channel_out_size);
+  if (!impl->processors || (channel_out_size > 0 && !impl->channel_out)) {
     error("could not allocate memory for processing channels");
     renderer_impl_destroy(impl);
     impl = 0;
@@ -63,7 +71,37 @@ void renderer_impl_destroy(renderer_impl_t *impl) {
   if (impl->processors)
     vector_free(impl->processors,
                 def_default_free_ptr(__destroy_processing_channel));
+  def_free(impl->channel_out);
   free(impl);
+}
+
+static processing_channel_t *__add_processing_channel(renderer_impl_t *impl,
+                                                      int track_id) {
+  processing_channel_t *processor = def_mallocz(processing_channel_t, 1);
+  if (!processor) {
+    error("could not allocate memory for processing channel.");
+    return 0;
+  }
+
+  processor->key = track_id;
+  processor->value = block_processing_channel_create(impl->gain_calculator,
+                                                     impl->max_block_samples);
+  if (!processor->value) {
+    error("could not create block processing channel.");
+    free(processor);
+    return 0;
+  }
+  vector_push(impl->processors, def_value_wrap_instance_ptr(processor));
+  return processor;
+}
+
+int renderer_impl_add_tracks(renderer_impl_t *impl, int num_tracks) {
+  for (int i = 0; i < num_tracks; ++i) {
+    if (!__find_processing_channel(impl->processors, i) &&
+        !__add_processing_channel(impl, i))
+      return -12;
+  }
+  return 0;
 }
 
 int renderer_impl_add_metadatas(renderer_impl_t *impl,
@@ -72,20 +110,8 @@ int renderer_impl_add_metadatas(renderer_impl_t *impl,
     processing_channel_t *processor = __find_processing_channel(
         impl->processors, metadata_blocks[i].track_id);
     if (!processor) {
-      processor = def_mallocz(processing_channel_t, 1);
-      if (!processor) {
-        error("could not allocate memory for processing channel.");
-        continue;
-      }
-
-      processor->key = metadata_blocks[i].track_id;
-      processor->value = block_processing_channel_create(impl->gain_calculator);
-      if (!processor->value) {
-        error("could not create block processing channel.");
-        free(processor);
-        continue;
-      }
-      vector_push(impl->processors, def_value_wrap_instance_ptr(processor));
+      processor = __add_processing_channel(impl, metadata_blocks[i].track_id);
+      if (!processor) continue;
     }
 
     block_processing_channel_add_metadata(processor->value,
@@ -97,9 +123,9 @@ int renderer_impl_add_metadatas(renderer_impl_t *impl,
 
 int renderer_impl_render(renderer_impl_t *impl, float *input, int samples,
                          int channels, uint64_t offset, float *out) {
-  float *channel_out = 0;
-  channel_out = def_malloc(float, samples * impl->output_channels);
-  if (!channel_out) return -12;
+  float *channel_out = impl->channel_out;
+  if (samples <= 0) return 0;
+  if (samples > impl->max_block_samples || !channel_out) return -22;
 
   for (int i = 0; i < channels; ++i) {
     processing_channel_t *processor =
@@ -116,7 +142,6 @@ int renderer_impl_render(renderer_impl_t *impl, float *input, int samples,
       }
     }
   }
-  free(channel_out);
 
   return 0;
 }

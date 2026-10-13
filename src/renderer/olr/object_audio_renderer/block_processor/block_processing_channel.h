@@ -20,8 +20,10 @@
 
 typedef struct BlockProcessingChannel block_processing_channel_t;
 
+/* max_block_samples is the longest metadata block the channel processes
+ * without allocating. */
 block_processing_channel_t* block_processing_channel_create(
-    layout_gain_calculator_t* gain_calculator);
+    layout_gain_calculator_t* gain_calculator, uint64_t max_block_samples);
 int block_processing_channel_add_metadata(block_processing_channel_t* self,
                                           metadata_block_t* metadata);
 int block_processing_channel_process(block_processing_channel_t* self,
