@@ -12,8 +12,11 @@
 
 #include "obr/renderer/obr_impl.h"
 
+#include <atomic>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1181,6 +1184,55 @@ TEST(ObrImplTest, TestProcessPlanarMatchesProcess) {
     EXPECT_THAT(renderer->RemoveLastAudioElement(), IsOk());
   }
   expect_same_output(30);
+}
+
+// Renders while a second thread sweeps the head rotation and toggles head
+// tracking and the limiter. None of those calls takes the mutex `Process()`
+// holds; the test checks the output stays finite, and a ThreadSanitizer build
+// checks the accesses.
+TEST(ObrImplTest, TestConcurrentHeadRotationDuringProcessing) {
+  const size_t kNumFrames = 256;
+  ObrImpl renderer(kNumFrames, kSamplingRate);
+  EXPECT_THAT(renderer.AddAudioElement(AudioElementType::k3OA), IsOk());
+  EXPECT_THAT(renderer.AddAudioElement(AudioElementType::kLayout7_1_4_ch),
+              IsOk());
+
+  AudioBuffer input_buffer(renderer.GetNumberOfInputChannels(), kNumFrames);
+  for (size_t ch = 0; ch < input_buffer.num_channels(); ++ch) {
+    GenerateWhiteNoise(0.1f, &input_buffer[ch], static_cast<int>(100 + ch));
+  }
+  AudioBuffer output_buffer(2, kNumFrames);
+
+  std::atomic<bool> stop{false};
+  std::atomic<int> failed_rotations{0};
+  std::thread control([&] {
+    for (int i = 0; !stop.load(std::memory_order_relaxed); ++i) {
+      const float half_angle = 0.005f * static_cast<float>(i % 1257);
+      if (!renderer
+               .SetHeadRotation(std::cos(half_angle), 0.0f, 0.0f,
+                                std::sin(half_angle))
+               .ok()) {
+        failed_rotations.fetch_add(1, std::memory_order_relaxed);
+      }
+      renderer.EnableHeadTracking(i % 2 == 0);
+      renderer.EnableLimiter(i % 3 != 0);
+    }
+  });
+
+  int non_finite = 0;
+  for (int block = 0; block < 500; ++block) {
+    renderer.Process(input_buffer, &output_buffer);
+    for (size_t ch = 0; ch < output_buffer.num_channels(); ++ch) {
+      for (size_t frame = 0; frame < kNumFrames; ++frame) {
+        if (!std::isfinite(output_buffer[ch][frame])) ++non_finite;
+      }
+    }
+  }
+  stop.store(true, std::memory_order_relaxed);
+  control.join();
+
+  EXPECT_EQ(non_finite, 0);
+  EXPECT_EQ(failed_rotations.load(), 0);
 }
 
 }  // namespace
