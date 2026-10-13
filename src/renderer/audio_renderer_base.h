@@ -33,12 +33,21 @@ typedef struct MetadataItem metadata_item_t;
 typedef struct AudioRenderingMetadata audio_rendering_metadata_t;
 typedef struct AudioElementContext audio_element_context_t;
 
+/* The number of queue nodes and metadata copies a metadata item reserves
+ * when it is created, and the most elapsed copies it keeps for reuse. A
+ * caller that pushes one block of metadata per render, or a few blocks
+ * ahead, then pushes without allocating. */
+#define def_metadata_item_spares 4
+
 // Public structure definitions
 typedef struct MetadataItem {
   uint32_t id;
   queue_t *metadatas;
   uint32_t start;
   uint32_t duration;
+  /* Metadata copies ready for the next push; none owns a gain array. */
+  oar_metadata_t *spares[def_metadata_item_spares];
+  int spare_count;
 } metadata_item_t;
 
 typedef struct AudioRenderingMetadata {
@@ -86,6 +95,17 @@ int audio_element_context_update_gain(audio_element_context_t *ctx,
 
 int audio_element_context_update_object_positions(
     audio_element_context_t *ctx, const oar_metadata_t *metadata);
+
+/* Creates the queue and reserves def_metadata_item_spares queue nodes and
+ * metadata copies. On failure the item holds what was allocated, and
+ * metadata_item_uninit() frees it. */
+int metadata_item_init(metadata_item_t *item, uint32_t id);
+void metadata_item_uninit(metadata_item_t *item);
+
+/* Queues a copy of metadata and adds its duration. The copy reuses a spare
+ * when one is left, unless the metadata carries a gain array
+ * (ck_param_multiple), which is copied into a new allocation. */
+int metadata_item_push(metadata_item_t *item, const oar_metadata_t *metadata);
 
 void metadata_item_elapse(metadata_item_t *item, uint32_t samples_per_channel);
 
