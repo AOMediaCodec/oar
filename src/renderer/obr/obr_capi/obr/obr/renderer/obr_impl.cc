@@ -514,7 +514,8 @@ absl::Status ObrImpl::SetElementHeadLocked(size_t audio_element_index,
                  << " head-locked rendering: "
                  << (head_locked ? "enabled" : "disabled");
 
-  return absl::OkStatus();
+  // The element's channels move to the other pass's encoder.
+  return UpdateAllAmbisonicEncoders();
 }
 
 std::string ObrImpl::GetAudioElementConfigLogMessage() {
