@@ -20,9 +20,13 @@
 
 typedef struct RendererImpl renderer_impl_t;
 
+/* max_block_samples is the most samples a render call processes. */
 renderer_impl_t *renderer_impl_create(layout_gain_calculator_t *gain_calculator,
-                                      int sample_rate);
+                                      int sample_rate, int max_block_samples);
 void renderer_impl_destroy(renderer_impl_t *impl);
+/* Creates the processing channels of tracks 0 to num_tracks - 1, which
+ * add_metadatas() otherwise creates on a track's first metadata block. */
+int renderer_impl_add_tracks(renderer_impl_t *impl, int num_tracks);
 int renderer_impl_add_metadatas(renderer_impl_t *impl,
                                 metadata_block_t *metadata_blocks, int n);
 int renderer_impl_render(renderer_impl_t *impl, float *input, int samples,

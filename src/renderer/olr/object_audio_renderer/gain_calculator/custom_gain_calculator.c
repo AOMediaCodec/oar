@@ -14,6 +14,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "definitions.h"
 #include "cvalue.h"
@@ -45,6 +46,9 @@ def_key_value_type(auto_float_t, vector_t *,
 def_key_value_type(auto_float_t, gain_calculator_t *, calculator);
 def_key_value_type(auto_float_t, auto_float_t, elevation_gain);
 
+/* The most layer gains one gain calculation pans between. */
+#define def_max_layer_gains 6
+
 
 // https://www.dsprelated.com/showarticle/1230.php
 static int tanlaw(auto_float_t source_angle, auto_float_t speaker_angle,
@@ -72,16 +76,19 @@ static int __find_elevation(value_wrap_t a, value_wrap_t b) {
   return def_value_wrap_float(&a) == def_value_wrap_float(&b);
 }
 
-static vector_t *layerwise_panner_calculate_gains(layerwise_panner_t *self,
-                                                  auto_float_t elevation) {
+/* Writes the elevation layers a source at `elevation` pans between, and the
+ * gain of each, into gains[0..1]. Returns the number written (1 or 2), or
+ * -22 when the layout has more layers than def_max_speakers. */
+static int layerwise_panner_calculate_gains(layerwise_panner_t *self,
+                                            auto_float_t elevation,
+                                            elevation_gain_t gains[2]) {
   auto_float_t min_ele = def_none_degree;
   auto_float_t max_ele = -def_none_degree;
   auto_float_t el = 0.f;
   int n = vector_size(self->ref_layers);
-  vector_t *gains = vector_new();
   value_wrap_t v;
 
-  if (!gains) return 0;
+  if (n > def_max_speakers) return -22;
 
   for (int i = 0; i < n; ++i) {
     el = def_value_wrap_float(vector_at(self->ref_layers, i));
@@ -91,36 +98,20 @@ static vector_t *layerwise_panner_calculate_gains(layerwise_panner_t *self,
 
   if (vector_find(self->ref_layers, def_value_wrap_instance_float(elevation),
                   __find_elevation, &v) >= 0) {
-    elevation_gain_t *ele_gain = def_mallocz(elevation_gain_t, 1);
-    if (ele_gain) {
-      *ele_gain = (elevation_gain_t){elevation, 1.0f};
-      vector_push(gains, def_value_wrap_instance_ptr(ele_gain));
-    }
+    gains[0] = (elevation_gain_t){elevation, 1.0f};
+    return 1;
   } else if (elevation < min_ele) {
-    elevation_gain_t *ele_gain = def_mallocz(elevation_gain_t, 1);
-    if (ele_gain) {
-      *ele_gain = (elevation_gain_t){min_ele, 1.0};
-      vector_push(gains, def_value_wrap_instance_ptr(ele_gain));
-    }
+    gains[0] = (elevation_gain_t){min_ele, 1.0};
+    return 1;
   } else if (elevation > max_ele) {
-    elevation_gain_t *ele_gain = def_mallocz(elevation_gain_t, 1);
-    if (ele_gain) {
-      *ele_gain = (elevation_gain_t){max_ele, 1.0};
-      vector_push(gains, def_value_wrap_instance_ptr(ele_gain));
-    }
+    gains[0] = (elevation_gain_t){max_ele, 1.0};
+    return 1;
   } else {
     auto_float_t ele[2];
     auto_float_t speaker_angle;
     auto_float_t ele_gains[2];
-    int *sortidxs = def_mallocz(int, n);
-    auto_float_t *abs_diffs = def_mallocz(auto_float_t, n);
-
-    if (!sortidxs || !abs_diffs) {
-      def_free(sortidxs);
-      def_free(abs_diffs);
-      vector_free(gains, def_default_free_ptr(free));
-      return 0;
-    }
+    int sortidxs[def_max_speakers];
+    auto_float_t abs_diffs[def_max_speakers];
 
     for (int i = 0; i < n; ++i) {
       el = def_value_wrap_float(vector_at(self->ref_layers, i));
@@ -142,21 +133,13 @@ static vector_t *layerwise_panner_calculate_gains(layerwise_panner_t *self,
            ele_gains);
 
     for (int i = 0; i < 2; ++i) {
-      elevation_gain_t *ele_gain = def_mallocz(elevation_gain_t, 1);
-      if (ele_gain) {
-        *ele_gain = (elevation_gain_t){ele[i], ele_gains[i]};
+      gains[i] = (elevation_gain_t){ele[i], ele_gains[i]};
 #ifdef __dbg__
-        trace("ele: %" def_f8g ", gain: %" def_f8g "", ele[i], ele_gains[i]);
+      trace("ele: %" def_f8g ", gain: %" def_f8g "", ele[i], ele_gains[i]);
 #endif
-        vector_push(gains, def_value_wrap_instance_ptr(ele_gain));
-      }
     }
-
-    free(sortidxs);
-    free(abs_diffs);
+    return 2;
   }
-
-  return gains;
 }
 
 static void _custom_gain_calculator_destroy(custom_gain_calculator_t *self);
@@ -303,29 +286,30 @@ int _custom_gain_calculator_calculate_gains(custom_gain_calculator_t *self,
                                             auto_float_t distance,
                                             auto_float_t *gains, int n) {
   int n_wo_lfe = self->speaker_layout_wo_lfe->num_speakers;
-  auto_float_t *gains_wo_lfe = def_mallocz(auto_float_t, n_wo_lfe);
-  vector_t *layer_gains =
-      layerwise_panner_calculate_gains(&self->layerwise_panner, elevation);
+  auto_float_t gains_wo_lfe[def_max_speakers] = {0};
+  /* The layers the source pans between: up to two, and up to two more for
+   * each of those that splits off the back of an asymmetric layout. */
+  elevation_gain_t layer_gains[def_max_layer_gains];
 
   auto_float_t gains_wo_lfe_norm = 0.f;
   auto_float_t new_elevation = def_none_degree;
 
-  int l = vector_size(layer_gains);
+  if (n_wo_lfe > def_max_speakers) return -22;
+
+  int l = layerwise_panner_calculate_gains(&self->layerwise_panner, elevation,
+                                           layer_gains);
   int layer_cnt = l;
 
-  if (!gains_wo_lfe || !layer_gains) {
-    vector_free(layer_gains, def_default_free_ptr(free));
-    free(gains_wo_lfe);
-    return -12;
-  }
+  if (l < 0) return l;
 
   for (int i = 0; i < n; ++i) gains[i] = 0.0f;
 
   for (int i = 0; i < l; ++i) {
-    elevation_gain_t *ele_gain = def_value_wrap_ptr(vector_at(layer_gains, i));
+    elevation_gain_t *ele_gain = &layer_gains[i];
     auto_float_t dbap_dist = 0.f, alpha = 0.f, gain_2d_norm = 0.f,
                  max = -def_none_degree, min = def_none_degree;
-    auto_float_t *vbap_gains, *dbap_gains, *gains_2d;
+    auto_float_t vbap_gains[def_max_speakers], dbap_gains[def_max_speakers],
+        gains_2d[def_max_speakers];
     calculator_t *calculator = 0;
     elevation_layer_t *layer = 0;
     value_wrap_t v;
@@ -360,43 +344,26 @@ int _custom_gain_calculator_calculate_gains(custom_gain_calculator_t *self,
       // If source in asymmetric layout and out of azimuth, separate to another
       // layer by modify elevation
       if (nc_abs(azimuth) > max_az) {
-        vector_t *layerwise_gains = 0;
+        elevation_gain_t layerwise_gains[2];
         int nn = 0;
         new_elevation =
             ele_gain->key * (1 - ((nc_abs(azimuth) - max_az) / (180 - max_az)));
 #ifdef __dbg__
         trace("new elevation %g", new_elevation);
 #endif
-        layerwise_gains = layerwise_panner_calculate_gains(
-            &self->layerwise_panner, new_elevation);
-        nn = vector_size(layerwise_gains);
-        for (int j = 0; j < nn; ++j) {
-          value_wrap_t *v = vector_at(layerwise_gains, j);
-          elevation_gain_t *nele_gain = def_value_wrap_ptr(v);
-          nele_gain->value *= ele_gain->value;
-          vector_push(layer_gains, *v);
-          v->ptr = 0;
-          ++l;
+        nn = layerwise_panner_calculate_gains(&self->layerwise_panner,
+                                              new_elevation, layerwise_gains);
+        for (int j = 0; j < nn && l < def_max_layer_gains; ++j) {
+          layerwise_gains[j].value *= ele_gain->value;
+          layer_gains[l++] = layerwise_gains[j];
         }
-        vector_free(layerwise_gains, 0);
         continue;
       }
     }
 
-    vbap_gains = def_mallocz(auto_float_t, n_wo_lfe);
-    dbap_gains = def_mallocz(auto_float_t, n_wo_lfe);
-    gains_2d = def_mallocz(auto_float_t, n_wo_lfe);
-
-    if (!vbap_gains || !dbap_gains || !gains_2d) {
-      def_free(vbap_gains);
-      def_free(dbap_gains);
-      def_free(gains_2d);
-
-      vector_free(layer_gains, def_default_free_ptr(free));
-      def_free(gains_wo_lfe);
-
-      return -12;
-    }
+    memset(vbap_gains, 0, sizeof(auto_float_t) * n_wo_lfe);
+    memset(dbap_gains, 0, sizeof(auto_float_t) * n_wo_lfe);
+    memset(gains_2d, 0, sizeof(auto_float_t) * n_wo_lfe);
 
     // Apply new elevation for seperated source from asymmetric layout
     if (layer_cnt < 0) elevation = new_elevation;
@@ -496,10 +463,6 @@ int _custom_gain_calculator_calculate_gains(custom_gain_calculator_t *self,
         gains_wo_lfe[idx] += gains_2d[j] * ele_gain->value;
       }
     }
-
-    def_free(vbap_gains);
-    def_free(dbap_gains);
-    def_free(gains_2d);
   }
 
 #ifdef __dbg__
@@ -516,9 +479,6 @@ int _custom_gain_calculator_calculate_gains(custom_gain_calculator_t *self,
       gains[i] = gains_wo_lfe[j++] / gains_wo_lfe_norm;
     }
   }
-
-  vector_free(layer_gains, def_default_free_ptr(free));
-  def_free(gains_wo_lfe);
 
   return 0;
 }

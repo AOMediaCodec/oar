@@ -39,6 +39,13 @@ typedef struct Slice {
   int e;
 } slice_t;
 
+struct ProcessingBlockStorage {
+  fixed_gains_t fixed;
+  interp_gains_t interp;
+  auto_float_t *interp_table;
+  uint64_t interp_capacity;
+};
+
 static int _processing_block_init(processing_block_t *self,
                                   uint64_t start_sample, uint64_t end_sample) {
   self->start_sample = start_sample;
@@ -122,6 +129,8 @@ static int _interp_gains_process(processing_block_t *self, uint64_t start,
                                  float *out);
 static void _interp_gains_destroy(processing_block_t *self);
 static void _init_interp_p(interp_gains_t *self);
+static void _fill_interp_p(interp_gains_t *self);
+static void _storage_block_destroy(processing_block_t *self);
 
 processing_block_t *interp_gains_create(uint64_t start_sample,
                                         uint64_t end_sample,
@@ -184,16 +193,23 @@ void _interp_gains_destroy(processing_block_t *self) {
 }
 
 void _init_interp_p(interp_gains_t *self) {
-  uint64_t n = 0;
-  auto_float_t start, end;
   if (self->base.last_sample <= self->base.first_sample) {
     warn("there are no samples");
     return;
   }
 
-  n = self->base.last_sample - self->base.first_sample;
-  self->gains_interp = def_mallocz(auto_float_t, n);
+  self->gains_interp = def_mallocz(
+      auto_float_t, self->base.last_sample - self->base.first_sample);
   if (!self->gains_interp) return;
+
+  _fill_interp_p(self);
+}
+
+/* Writes the interpolation table into self->gains_interp, which holds
+ * last_sample - first_sample values. */
+void _fill_interp_p(interp_gains_t *self) {
+  uint64_t n = self->base.last_sample - self->base.first_sample;
+  auto_float_t start, end;
 
   start = (auto_float_t)(self->base.first_sample - self->base.start_sample) /
           (self->base.end_sample - self->base.start_sample);
@@ -202,4 +218,77 @@ void _init_interp_p(interp_gains_t *self) {
 
   for (int i = 0; i < n; ++i)
     self->gains_interp[i] = start + i * ((end - start) / n);
+}
+
+processing_block_storage_t *processing_block_storage_create(
+    uint64_t max_samples) {
+  processing_block_storage_t *storage =
+      def_mallocz(processing_block_storage_t, 1);
+  if (!storage) return 0;
+  if (max_samples > 0) {
+    storage->interp_table = def_mallocz(auto_float_t, max_samples);
+    if (!storage->interp_table) {
+      free(storage);
+      return 0;
+    }
+    storage->interp_capacity = max_samples;
+  }
+  return storage;
+}
+
+void processing_block_storage_destroy(processing_block_storage_t *storage) {
+  if (!storage) return;
+  def_free(storage->interp_table);
+  free(storage);
+}
+
+void _storage_block_destroy(processing_block_t *self) {}
+
+processing_block_t *fixed_gains_init(processing_block_storage_t *storage,
+                                     uint64_t start_sample, uint64_t end_sample,
+                                     auto_float_t *gains, int n) {
+  fixed_gains_t *fixed_gains = &storage->fixed;
+  memset(fixed_gains, 0, sizeof(fixed_gains_t));
+  _processing_block_init(&fixed_gains->base, start_sample, end_sample);
+  fixed_gains->base.process = _fixed_gains_process;
+  fixed_gains->base.destroy = _storage_block_destroy;
+  fixed_gains->gains = gains;
+  fixed_gains->num_gains = n;
+#ifdef __dbg__
+  debug_array_float("Fixed gains", gains, n);
+#endif
+  return (processing_block_t *)fixed_gains;
+}
+
+processing_block_t *interp_gains_init(processing_block_storage_t *storage,
+                                      uint64_t start_sample,
+                                      uint64_t end_sample,
+                                      auto_float_t *gains_start,
+                                      auto_float_t *gains_end, int n) {
+  interp_gains_t *self = &storage->interp;
+  memset(self, 0, sizeof(interp_gains_t));
+  self->base.process = _interp_gains_process;
+  self->base.destroy = _storage_block_destroy;
+  _processing_block_init(&self->base, start_sample, end_sample);
+  self->gains_start = gains_start;
+  self->gains_end = gains_end;
+  self->num_gains = n;
+
+  if (self->base.last_sample <= self->base.first_sample) {
+    warn("there are no samples");
+    return (processing_block_t *)self;
+  }
+
+  /* A block longer than the storage was sized for grows the table. */
+  const uint64_t samples = self->base.last_sample - self->base.first_sample;
+  if (samples > storage->interp_capacity) {
+    auto_float_t *table = def_mallocz(auto_float_t, samples);
+    if (!table) return (processing_block_t *)self;
+    def_free(storage->interp_table);
+    storage->interp_table = table;
+    storage->interp_capacity = samples;
+  }
+  self->gains_interp = storage->interp_table;
+  _fill_interp_p(self);
+  return (processing_block_t *)self;
 }

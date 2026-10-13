@@ -14,6 +14,7 @@
 
 #include <math.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "carray.h"
 #include "clog.h"
@@ -310,11 +311,11 @@ static int _vbap_panner_2d_calculate_gains(vbap_panner_2d_t *self,
   for (; i < r; ++i) {
     vbap_region_t *region = def_value_wrap_ptr(vector_at(self->regions, i));
     int s = 0;
-    auto_float_t *r_gains = 0;
+    auto_float_t r_gains[def_max_speakers];
 
     s = array_size(region->ref_speaker_indices);
-    r_gains = def_mallocz(auto_float_t, s);
-    if (!r_gains) continue;
+    if (s > def_max_speakers) continue;
+    memset(r_gains, 0, sizeof(auto_float_t) * s);
 
     if (region->base.calculate_gains(&region->base, azimuth, elevation,
                                      distance, r_gains, s) >= 0) {
@@ -324,11 +325,9 @@ static int _vbap_panner_2d_calculate_gains(vbap_panner_2d_t *self,
           gains[def_value_wrap_i32(array_at(region->ref_speaker_indices, j))] +=
               r_gains[j] / r_gains_norm;
         }
-        free(r_gains);
         break;
       }
     }
-    free(r_gains);
   }
 
   // If source is not contain in regions, find closest speaker by azimuth

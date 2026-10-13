@@ -21,6 +21,10 @@ deque_t *deque_new();
 void deque_free(deque_t *dq, func_value_wrap_ptr_free_t);
 int deque_is_empty(deque_t *dq);
 int deque_length(deque_t *dq);
+/* Keeps at least n spare nodes, so that the next n pushes do not allocate.
+ * Popped nodes become spares too. Returns 0, -12 when an allocation fails,
+ * or -22 for invalid arguments. */
+int deque_reserve(deque_t *dq, int n);
 int deque_push_front(deque_t *dq, value_wrap_t data);
 int deque_push_back(deque_t *dq, value_wrap_t data);
 int deque_pop_front(deque_t *dq, value_wrap_t *data);

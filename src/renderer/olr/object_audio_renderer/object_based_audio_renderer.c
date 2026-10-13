@@ -24,7 +24,8 @@ struct ObjectAudioRenderer {
 };
 
 object_audio_renderer_t *object_audio_renderer_create(
-    olr_layout_t layout, gain_calculator_type_t type, int sample_rate) {
+    olr_layout_t layout, gain_calculator_type_t type, int sample_rate,
+    int max_block_samples) {
   object_audio_renderer_t *renderer = 0;
   layout_gain_calculator_t *calculator =
       layout_gain_calculator_create(type, layout);
@@ -37,7 +38,7 @@ object_audio_renderer_t *object_audio_renderer_create(
   }
   renderer->calculator = calculator;
 
-  impl = renderer_impl_create(calculator, sample_rate);
+  impl = renderer_impl_create(calculator, sample_rate, max_block_samples);
   renderer->impl = impl;
 
   return renderer;
@@ -49,6 +50,12 @@ void object_audio_renderer_destroy(object_audio_renderer_t *renderer) {
     layout_gain_calculator_destroy(renderer->calculator);
   if (renderer->impl) renderer_impl_destroy(renderer->impl);
   free(renderer);
+}
+
+int object_audio_renderer_add_tracks(object_audio_renderer_t *renderer,
+                                     int num_tracks) {
+  if (!renderer || !renderer->impl) return -22;
+  return renderer_impl_add_tracks(renderer->impl, num_tracks);
 }
 
 int object_audio_renderer_add_metadatas(object_audio_renderer_t *renderer,

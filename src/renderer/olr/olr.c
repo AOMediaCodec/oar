@@ -105,8 +105,9 @@ static int _open(renderer_library_context_t *ctx) {
 
   olr->layout = _get_output_layout(ctx->out);
 
-  olr->api = object_audio_renderer_create(
-      olr->layout, ck_gain_calculator_custom, ctx->sample_rate);
+  olr->api =
+      object_audio_renderer_create(olr->layout, ck_gain_calculator_custom,
+                                   ctx->sample_rate, ctx->samples_per_frame);
   if (!olr->api) {
     error("OLR: Failed to create object_audio_renderer instance for layout %d.",
           olr->layout);
@@ -142,6 +143,11 @@ static int _open(renderer_library_context_t *ctx) {
 
     for (uint32_t i = 0; i < olr->num_objects; i++)
       olr->metadata_blocks[i].track_id = i;
+
+    if (object_audio_renderer_add_tracks(olr->api, olr->num_objects) != 0) {
+      _close(ctx);
+      return ck_oar_error_nomem;
+    }
   }
 
   return ck_oar_ok;
