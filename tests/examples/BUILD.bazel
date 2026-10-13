@@ -96,3 +96,11 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_binaural_mixed_lock",
+    srcs = ["test_binaural_mixed_lock.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)

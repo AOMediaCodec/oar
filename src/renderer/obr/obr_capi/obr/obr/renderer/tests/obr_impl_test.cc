@@ -13,6 +13,7 @@
 #include "obr/renderer/obr_impl.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -628,6 +629,60 @@ TEST(ObrImplTest, TestMultipleObjectsWithDifferentPositions) {
   // Clean up.
   for (int i = 0; i < 4; ++i) {
     EXPECT_THAT(renderer.RemoveLastAudioElement(), IsOk());
+  }
+}
+
+// Renders 8 blocks of noise through input channel `noise_channel`, with
+// every other input channel silent, and returns both ears' output samples.
+std::vector<float> RenderNoiseThrough(ObrImpl& renderer, size_t noise_channel) {
+  AudioBuffer input(renderer.GetNumberOfInputChannels(), kBufferSizePerChannel);
+  AudioBuffer output(2, kBufferSizePerChannel);
+  std::vector<float> rendered;
+  uint32_t state = 12345;
+  for (int block = 0; block < 8; ++block) {
+    input.Clear();
+    for (int frame = 0; frame < kBufferSizePerChannel; ++frame) {
+      state = state * 1664525u + 1013904223u;
+      input[noise_channel][frame] =
+          static_cast<float>(state >> 8) / 16777216.0f - 0.5f;
+    }
+    renderer.Process(input, &output);
+    for (size_t channel = 0; channel < 2; ++channel) {
+      for (int frame = 0; frame < kBufferSizePerChannel; ++frame) {
+        rendered.push_back(output[channel][frame]);
+      }
+    }
+  }
+  return rendered;
+}
+
+// `SetElementHeadLocked()` moves an element's channels to the other pass's
+// encoder. Element 0 (silent, at +90 degrees) is set head-locked beside
+// element 1 (noise, at -90 degrees), and then back to world-locked, which
+// leaves the head-locked pass empty. Both render as element 1 alone.
+TEST(ObrImplTest, TestSetElementHeadLockedUpdatesEncoders) {
+  ObrImpl reference(kBufferSizePerChannel, kSamplingRate);
+  ASSERT_THAT(reference.AddAudioElement(AudioElementType::kObjectMono,
+                                        BinauralFilterProfile::kAmbient),
+              IsOk());
+  ASSERT_THAT(reference.UpdateObjectPosition(0, -90.0f, 0.0f, 1.0f), IsOk());
+  const std::vector<float> expected = RenderNoiseThrough(reference, 0);
+
+  for (const bool back_to_world_locked : {false, true}) {
+    SCOPED_TRACE(back_to_world_locked);
+    ObrImpl renderer(kBufferSizePerChannel, kSamplingRate);
+    for (int i = 0; i < 2; ++i) {
+      ASSERT_THAT(renderer.AddAudioElement(AudioElementType::kObjectMono,
+                                           BinauralFilterProfile::kAmbient),
+                  IsOk());
+    }
+    ASSERT_THAT(renderer.UpdateObjectPosition(0, 90.0f, 0.0f, 1.0f), IsOk());
+    ASSERT_THAT(renderer.UpdateObjectPosition(1, -90.0f, 0.0f, 1.0f), IsOk());
+    ASSERT_THAT(renderer.SetElementHeadLocked(0, true), IsOk());
+    if (back_to_world_locked) {
+      ASSERT_THAT(renderer.SetElementHeadLocked(0, false), IsOk());
+    }
+    EXPECT_EQ(RenderNoiseThrough(renderer, 1), expected);
   }
 }
 

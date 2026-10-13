@@ -157,6 +157,10 @@ class ObrImpl {
    * Calling this function on passthrough elements will log a warning and
    * return success as a no-op.
    *
+   * A change moves the element's channels to the Ambisonic encoder of the
+   * other pass (world-locked or head-locked), which allocates when that
+   * encoder's source count changes; call it on a configuring thread.
+   *
    * \param audio_element_index Index of the audio element (0-based).
    * \param head_locked True to enable head-locked rendering (no rotation),
    *                    false to enable world-locked rendering (rotated).

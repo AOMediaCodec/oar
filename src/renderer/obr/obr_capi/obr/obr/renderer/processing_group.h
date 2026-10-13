@@ -146,13 +146,23 @@ class ProcessingGroup {
   BinauralFilterProfile GetFilterProfile() const { return key_.filter_profile; }
 
  private:
-  /*!\brief Get source channel indices for the Ambisonic encoder.
+  /*!\brief Ambisonic encoder for the world-locked or the head-locked
+   * loudspeaker layout and object channels of this group.
+   */
+  struct EncoderPass {
+    std::unique_ptr<AmbisonicEncoder> encoder;
+    AudioBuffer input_buffer;
+  };
+
+  /*!\brief Creates or resizes the encoder of one pass and sets its sources.
    *
    * \param audio_elements Reference to all audio elements.
-   * \return Vector of input channel indices for all sources.
+   * \param head_locked If true, the head-locked pass; if false, the
+   *        world-locked pass.
+   * \param pass The pass's encoder and input buffer.
    */
-  std::vector<size_t> GetAmbisonicEncoderSourceChannelIndices(
-      const std::vector<AudioElementConfig>& audio_elements) const;
+  void UpdateEncoderPass(std::vector<AudioElementConfig>& audio_elements,
+                         bool head_locked, EncoderPass* pass);
 
   /*!\brief Get source channel indices for the Ambisonic encoder, filtered by
    * head-locked status.
@@ -182,9 +192,13 @@ class ProcessingGroup {
   // Ambisonic mix bed for head-locked elements (never rotated).
   AudioBuffer ambisonic_mix_bed_head_locked_;
 
-  // Ambisonic encoder for loudspeaker layout and object types.
-  std::unique_ptr<AmbisonicEncoder> ambisonic_encoder_;
-  AudioBuffer ambisonic_encoder_input_buffer_;
+  // Ambisonic encoders for the loudspeaker layout and object channels of the
+  // world-locked and of the head-locked elements. Each holds only its own
+  // elements' channels as sources, in the order of `audio_element_indices_`,
+  // so the channels a pass copies to its encoder's inputs 0 to k-1 are
+  // encoded with their own positions.
+  EncoderPass world_locked_encoder_;
+  EncoderPass head_locked_encoder_;
 
   // Ambisonic rotator for this group.
   std::unique_ptr<AmbisonicRotator> ambisonic_rotator_;
