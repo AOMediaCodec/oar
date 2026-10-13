@@ -37,4 +37,24 @@ processing_block_t *interp_gains_create(uint64_t start_sample,
                                         auto_float_t *gains_start,
                                         auto_float_t *gains_end, int num);
 
+/* Storage for one processing block at a time, with an interpolation table
+ * for blocks of up to max_samples samples. fixed_gains_init() and
+ * interp_gains_init() build their block in the storage instead of
+ * allocating it; the block's destroy() does nothing, and the next init
+ * replaces the block. interp_gains_init() grows the table for a longer
+ * block. */
+typedef struct ProcessingBlockStorage processing_block_storage_t;
+
+processing_block_storage_t *processing_block_storage_create(
+    uint64_t max_samples);
+void processing_block_storage_destroy(processing_block_storage_t *storage);
+processing_block_t *fixed_gains_init(processing_block_storage_t *storage,
+                                     uint64_t start_sample, uint64_t end_sample,
+                                     auto_float_t *gain, int num);
+processing_block_t *interp_gains_init(processing_block_storage_t *storage,
+                                      uint64_t start_sample,
+                                      uint64_t end_sample,
+                                      auto_float_t *gains_start,
+                                      auto_float_t *gains_end, int num);
+
 #endif

@@ -35,9 +35,16 @@ static int _nc_argsort_compare(const void *a, const void *b) {
   return pa->value < pb->value ? 0 : 1;
 }
 
+/* Arrays up to this length are sorted in a stack buffer. */
+#define def_nc_argsort_stack_size 64
+
 int nc_argsort(const auto_float_t *arr, int n, int *idx) {
-  nc_pair_t *pairs = malloc(n * sizeof(nc_pair_t));
-  if (!pairs) return -12;
+  nc_pair_t stack_pairs[def_nc_argsort_stack_size];
+  nc_pair_t *pairs = stack_pairs;
+  if (n > def_nc_argsort_stack_size) {
+    pairs = malloc(n * sizeof(nc_pair_t));
+    if (!pairs) return -12;
+  }
   for (int i = 0; i < n; ++i) {
     pairs[i].key = i;
     pairs[i].value = arr[i];
@@ -48,7 +55,7 @@ int nc_argsort(const auto_float_t *arr, int n, int *idx) {
   for (int i = 0; i < n; ++i) {
     idx[i] = pairs[i].key;
   }
-  free(pairs);
+  if (pairs != stack_pairs) free(pairs);
   return 0;
 }
 

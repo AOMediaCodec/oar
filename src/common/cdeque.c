@@ -28,16 +28,44 @@ struct CDeque {
   node_t* front;
   node_t* rear;
   int length;
+  /* Nodes popped off the deque or reserved with deque_reserve(), reused by
+   * the next push. A deque whose length stays within the nodes it has held
+   * before does not allocate on push or free on pop. */
+  node_t* spare;
 };
 
-static node_t* create_node(value_wrap_t data) {
-  node_t* new_node = calloc(1, sizeof(node_t));
-  if (!new_node) {
-    fprintf(stderr, "fail to allocate memory.\n");
-    return 0;
+static node_t* create_node(deque_t* dq, value_wrap_t data) {
+  node_t* new_node = dq->spare;
+  if (new_node) {
+    dq->spare = new_node->next;
+    new_node->prev = new_node->next = 0;
+  } else {
+    new_node = calloc(1, sizeof(node_t));
+    if (!new_node) {
+      fprintf(stderr, "fail to allocate memory.\n");
+      return 0;
+    }
   }
   new_node->data = data;
   return new_node;
+}
+
+static void release_node(deque_t* dq, node_t* node) {
+  node->prev = 0;
+  node->next = dq->spare;
+  dq->spare = node;
+}
+
+int deque_reserve(deque_t* dq, int n) {
+  int spares = 0;
+  if (!dq || n < 0) return -22;
+  for (node_t* s = dq->spare; s; s = s->next) ++spares;
+  for (; spares < n; ++spares) {
+    node_t* node = calloc(1, sizeof(node_t));
+    if (!node) return -12;
+    release_node(dq, node);
+  }
+  return 0;
 }
 
 deque_t* deque_new() {
@@ -51,7 +79,7 @@ int deque_is_empty(deque_t* dq) { return !dq->front; }
 int deque_length(deque_t* dq) { return dq->length; }
 
 int deque_push_front(deque_t* dq, value_wrap_t data) {
-  node_t* new_node = create_node(data);
+  node_t* new_node = create_node(dq, data);
 
   if (!new_node) return -12;
 
@@ -66,7 +94,7 @@ int deque_push_front(deque_t* dq, value_wrap_t data) {
 }
 
 int deque_push_back(deque_t* dq, value_wrap_t data) {
-  node_t* new_node = create_node(data);
+  node_t* new_node = create_node(dq, data);
 
   if (!new_node) return -12;
 
@@ -97,7 +125,7 @@ int deque_pop_front(deque_t* dq, value_wrap_t* data) {
     dq->front->prev = 0;
   }
 
-  free(temp);
+  release_node(dq, temp);
   return --dq->length;
 }
 
@@ -117,7 +145,7 @@ int deque_pop_back(deque_t* dq, value_wrap_t* data) {
     dq->rear = dq->rear->prev;
     dq->rear->next = 0;
   }
-  free(temp);
+  release_node(dq, temp);
   return --dq->length;
 }
 
@@ -126,6 +154,11 @@ void deque_free(deque_t* dq, func_value_wrap_ptr_free_t free_func) {
   while (!deque_is_empty(dq)) {
     deque_pop_front(dq, &data);
     if (free_func && data.ptr) free_func(data.ptr);
+  }
+  while (dq->spare) {
+    node_t* node = dq->spare;
+    dq->spare = node->next;
+    free(node);
   }
   free(dq);
 }

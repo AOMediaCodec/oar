@@ -108,7 +108,7 @@ static int render_short_blocks(int call, float *out) {
   const int half = BLOCK / 2;
   float in[BLOCK];
   object_audio_renderer_t *olr = object_audio_renderer_create(
-      ck_olr_layout_200, ck_gain_calculator_custom, 48000);
+      ck_olr_layout_200, ck_gain_calculator_custom, 48000, BLOCK);
   if (!olr) return -1;
   int ret = 0;
   for (int b = 0; ret == 0 && b < 2 * BLOCKS; b++) {
@@ -143,7 +143,7 @@ static int test_blocks_inside_a_call(void) {
 static int render_at(uint64_t base, int block, int call, float *out) {
   float in[4 * BLOCK];
   object_audio_renderer_t *olr = object_audio_renderer_create(
-      ck_olr_layout_200, ck_gain_calculator_custom, 48000);
+      ck_olr_layout_200, ck_gain_calculator_custom, 48000, 2 * BLOCK);
   if (!olr) return -1;
   int ret = 0;
   for (int b = 0; ret == 0 && b < 2; b++) {

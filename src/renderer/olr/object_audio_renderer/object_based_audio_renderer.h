@@ -75,10 +75,13 @@ typedef struct MetadataBlock {
  * @param layout @ref olr_layout_t
  * @param type @ref gain_calculator_type_t
  * @param sample_rate sample rate of the input signal.
+ * @param max_block_samples the most samples per channel a render call
+ * processes, and the longest metadata block processed without allocating.
  * @return object_audio_renderer_t*
  */
 object_audio_renderer_t *object_audio_renderer_create(
-    olr_layout_t layout, gain_calculator_type_t type, int sample_rate);
+    olr_layout_t layout, gain_calculator_type_t type, int sample_rate,
+    int max_block_samples);
 
 /**
  * @brief Destroy the object audio renderer instance.
@@ -86,6 +89,18 @@ object_audio_renderer_t *object_audio_renderer_create(
  * @param renderer
  */
 void object_audio_renderer_destroy(object_audio_renderer_t *renderer);
+
+/**
+ * @brief Create the processing of tracks 0 to num_tracks - 1 now, instead of
+ * on each track's first metadata block, so that the first render after the
+ * first metadata does not allocate it.
+ *
+ * @param renderer The object audio renderer instance.
+ * @param num_tracks The number of tracks.
+ * @return int 0 on success, -12 when an allocation fails.
+ */
+int object_audio_renderer_add_tracks(object_audio_renderer_t *renderer,
+                                     int num_tracks);
 
 /**
  * @brief Set the metadata blocks.
