@@ -15,7 +15,6 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdlib>
-#include <vector>
 
 #include "absl/log/absl_check.h"
 #include "obr/audio_buffer/audio_buffer.h"
@@ -36,30 +35,27 @@ void PeakLimiter::Process(const AudioBuffer& input, AudioBuffer* output) {
   const size_t num_channels = input.num_channels();
   const size_t num_frames = input.num_frames();
 
-  // Get a vector of maximum sample values across all channels.
-  std::vector<float> max_samples(num_frames, 0.0);
-  for (const auto& channel : input) {
-    for (size_t frame = 0; frame < num_frames; ++frame) {
-      max_samples[frame] = std::max(max_samples[frame], abs(channel[frame]));
-    }
-  }
-
-  // Get the limiter envelope.
-  std::vector<float> limiter_env(num_frames, 0.0);
+  // One pass per frame, so the limiter needs no per-call storage: the
+  // maximum sample value across all channels, the limiter envelope at that
+  // frame, then the envelope applied to every channel. Each frame reads its
+  // input before writing its output, so `input` and `output` may be the
+  // same buffer.
   for (size_t frame = 0; frame < num_frames; ++frame) {
-    double max_req_gain = GetMaximumRequiredGain(max_samples[frame]);
+    float max_sample = 0.0f;
+    for (size_t channel = 0; channel < num_channels; ++channel) {
+      max_sample = std::max(max_sample, abs(input[channel][frame]));
+    }
+
+    const double max_req_gain = GetMaximumRequiredGain(max_sample);
     if (max_req_gain < env_) {
       env_ = max_req_gain;
     } else {
       env_ = release_time_constant_ * (env_ - max_req_gain) + max_req_gain;
     }
-    limiter_env[frame] = static_cast<float>(env_);
-  }
+    const float gain = static_cast<float>(env_);
 
-  // Apply the limiter envelope to the input buffer.
-  for (size_t channel = 0; channel < num_channels; ++channel) {
-    for (size_t frame = 0; frame < num_frames; ++frame) {
-      (*output)[channel][frame] = input[channel][frame] * limiter_env[frame];
+    for (size_t channel = 0; channel < num_channels; ++channel) {
+      (*output)[channel][frame] = input[channel][frame] * gain;
     }
   }
 }

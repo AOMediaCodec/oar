@@ -146,12 +146,12 @@ class ProcessingGroup {
   BinauralFilterProfile GetFilterProfile() const { return key_.filter_profile; }
 
  private:
-  /*!\brief Get source channel indices for the Ambisonic encoder.
+  /*!\brief Get the number of source channels for the Ambisonic encoder.
    *
    * \param audio_elements Reference to all audio elements.
-   * \return Vector of input channel indices for all sources.
+   * \return Number of input channels of all sources.
    */
-  std::vector<size_t> GetAmbisonicEncoderSourceChannelIndices(
+  size_t GetNumberOfAmbisonicEncoderSourceChannels(
       const std::vector<AudioElementConfig>& audio_elements) const;
 
   /*!\brief Get source channel indices for the Ambisonic encoder, filtered by
@@ -161,11 +161,13 @@ class ProcessingGroup {
    * \param filter_head_locked If true, return indices of head-locked elements;
    *                           if false, return indices of world-locked
    * elements.
-   * \return Vector of input channel indices matching the filter.
+   * \param indices Output vector of input channel indices matching the
+   *        filter. It does not allocate when its capacity holds all source
+   *        channels, which `UpdateAmbisonicEncoder()` reserves.
    */
-  std::vector<size_t> GetAmbisonicEncoderSourceChannelIndices(
+  void GetAmbisonicEncoderSourceChannelIndices(
       const std::vector<AudioElementConfig>& audio_elements,
-      bool filter_head_locked) const;
+      bool filter_head_locked, std::vector<size_t>* indices) const;
 
   ProcessingGroupKey key_;
 
@@ -185,6 +187,12 @@ class ProcessingGroup {
   // Ambisonic encoder for loudspeaker layout and object types.
   std::unique_ptr<AmbisonicEncoder> ambisonic_encoder_;
   AudioBuffer ambisonic_encoder_input_buffer_;
+
+  // Encoder source channel indices of the world-locked and head-locked
+  // elements, filled by `Process()` within the capacity reserved by
+  // `UpdateAmbisonicEncoder()`.
+  std::vector<size_t> world_locked_indices_;
+  std::vector<size_t> head_locked_indices_;
 
   // Ambisonic rotator for this group.
   std::unique_ptr<AmbisonicRotator> ambisonic_rotator_;
