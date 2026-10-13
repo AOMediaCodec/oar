@@ -41,6 +41,7 @@ target_include_directories(test_olr_render_offsets PRIVATE
   ${PROJECT_SOURCE_DIR}/src/renderer/olr/object_audio_renderer
   ${PROJECT_SOURCE_DIR}/src
   ${PROJECT_SOURCE_DIR}/src/common)
+oar_add_test(test_render_scratch)
 
 # The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
 # into the library when OAR_ENABLE_HOA_LFE is ON.

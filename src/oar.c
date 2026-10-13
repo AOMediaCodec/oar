@@ -61,6 +61,12 @@ struct Oar {
   quaternion_t head_rotation;
   oar_limiter_t *limiter;
   uint32_t metadata_samples[ck_metadata_count];
+  /* oar_render() scratch, sized by oar_add_audio_group() and kept between
+   * calls. */
+  float *scratch;
+  size_t scratch_floats;
+  oar_audio_block_t *scratch_blocks;
+  int scratch_block_count;
 
 #ifdef __as_dbg__
   void *mixed;
@@ -70,6 +76,30 @@ struct Oar {
 static int _apply_gain(oar_audio_block_t *block, float gain) {
   for (uint32_t i = 0; i < block->channels * block->samples_per_channel; i++)
     block->data[i] *= gain;
+  return ck_oar_ok;
+}
+
+/* Grows the oar_render() scratch to hold group_count group blocks plus one
+ * renderer output block. oar_add_audio_group() is its only caller, on the
+ * configuring thread; oar_render() checks the size and does not allocate. */
+static int _reserve_render_scratch(oar_t *oar, int group_count) {
+  const size_t block_floats = (size_t)oar_get_number_of_output_channels(oar) *
+                              oar->config.samples_per_channel;
+  const size_t needed = block_floats * (size_t)(group_count + 1);
+  if (oar->scratch_floats < needed) {
+    float *grown = def_malloc(float, needed);
+    if (!grown) return ck_oar_error_nomem;
+    def_free(oar->scratch);
+    oar->scratch = grown;
+    oar->scratch_floats = needed;
+  }
+  if (oar->scratch_block_count < group_count) {
+    oar_audio_block_t *grown = def_malloc(oar_audio_block_t, group_count);
+    if (!grown) return ck_oar_error_nomem;
+    def_free(oar->scratch_blocks);
+    oar->scratch_blocks = grown;
+    oar->scratch_block_count = group_count;
+  }
   return ck_oar_ok;
 }
 
@@ -192,6 +222,8 @@ void oar_destroy(oar_t *oar) {
       vector_free(oar->groups, def_default_free_ptr(_audio_group_delete));
     renderer_library_manager_clear(&oar->renderer_library_manager);
     oar_limiter_destroy(oar->limiter);
+    def_free(oar->scratch);
+    def_free(oar->scratch_blocks);
 
 #ifdef __as_dbg__
     if (oar->mixed) wav_writer_close(oar->mixed);
@@ -248,7 +280,8 @@ int oar_add_audio_group(oar_t *oar) {
     }
   }
 
-  if (!group->renderers || !group->output_gain.metadatas) {
+  if (!group->renderers || !group->output_gain.metadatas ||
+      _reserve_render_scratch(oar, vector_size(oar->groups) + 1) != ck_oar_ok) {
     _audio_group_delete(group);
     return ck_oar_error_nomem;
   }
@@ -517,38 +550,37 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
   out_channels = oar_get_number_of_output_channels(oar);
   samples = oar->config.samples_per_channel;
 
+  /* A configuration with no output channels or no samples per channel has
+   * no scratch storage and nothing to render. */
+  if (!out_channels || !samples) return ck_oar_error_inval;
+
   if (output->channels != out_channels || output->samples_per_channel < samples)
     return ck_oar_error_inval;
 
   group_count = vector_size(oar->groups);
   if (group_count <= 0) return ck_oar_error_inval;
 
-  group_blocks = def_malloc(oar_audio_block_t, group_count);
-  if (!group_blocks) return ck_oar_error_nomem;
-
-  for (i = 0; i < group_count; i++) {
-    group_blocks[i].channels = out_channels;
-    group_blocks[i].samples_per_channel = samples;
-    group_blocks[i].data = def_mallocz(float, (out_channels * samples));
-    if (!group_blocks[i].data) {
-      for (int j = 0; j < i; j++) {
-        if (group_blocks[j].data) def_free(group_blocks[j].data);
-      }
-      def_free(group_blocks);
-      return ck_oar_error_nomem;
-    }
-  }
-
-  // Create temporary renderer output block
-  renderer_output.channels = out_channels;
-  renderer_output.samples_per_channel = samples;
-  renderer_output.data = def_mallocz(float, (out_channels * samples));
-  if (!renderer_output.data) {
+  {
+    const size_t block_floats = (size_t)out_channels * samples;
+    /* oar_add_audio_group() sizes the scratch before it adds a group, and
+     * the configuration does not change after oar_create(), so this check
+     * does not fail through the API; it keeps the memset below in bounds if
+     * that ever changes. oar_render() does not allocate the scratch: it runs
+     * on the caller's render thread. */
+    if (oar->scratch_block_count < group_count ||
+        oar->scratch_floats < block_floats * (size_t)(group_count + 1))
+      return ck_oar_error_inval;
+    memset(oar->scratch, 0,
+           sizeof(float) * block_floats * (size_t)(group_count + 1));
+    group_blocks = oar->scratch_blocks;
     for (i = 0; i < group_count; i++) {
-      if (group_blocks[i].data) def_free(group_blocks[i].data);
+      group_blocks[i].channels = out_channels;
+      group_blocks[i].samples_per_channel = samples;
+      group_blocks[i].data = oar->scratch + block_floats * i;
     }
-    def_free(group_blocks);
-    return ck_oar_error_nomem;
+    renderer_output.channels = out_channels;
+    renderer_output.samples_per_channel = samples;
+    renderer_output.data = oar->scratch + block_floats * group_count;
   }
 
   int any_data = 0;
@@ -582,9 +614,6 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
       _apply_gain(&group_blocks[i], group->loudness_gain);
   }
 
-  // Free the temporary renderer output block
-  def_free(renderer_output.data);
-
   memset(output->data, 0, sizeof(float) * out_channels * samples);
 
   if (output->samples_per_channel != samples)
@@ -609,10 +638,6 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
   _oar_metadatas_elapse(oar, samples);
 
 cleanup:
-  for (i = 0; i < group_count; i++)
-    if (group_blocks[i].data) def_free(group_blocks[i].data);
-  def_free(group_blocks);
-
   return any_data ? ck_oar_ok : ck_oar_error_inval;
 }
 

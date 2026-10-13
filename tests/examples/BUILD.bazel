@@ -135,3 +135,12 @@ cc_test(
         "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
     ],
 )
+
+cc_test(
+    name = "test_render_scratch",
+    srcs = ["test_render_scratch.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
