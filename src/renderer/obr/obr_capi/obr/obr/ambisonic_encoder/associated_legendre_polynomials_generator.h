@@ -41,6 +41,15 @@ class AssociatedLegendrePolynomialsGenerator {
    */
   std::vector<float> Generate(float x) const;
 
+  /*!\brief Generates the associated Legendre polynomials for the given `x`
+   *        into `values_out`, which is resized to `GetNumValues()` and does
+   *        not allocate when its capacity is at least that.
+   *
+   * \param x Abscissa (the polynomials' variable).
+   * \param values_out Output vector of computed sequence values.
+   */
+  void Generate(float x, std::vector<float>* values_out) const;
+
   /*!\brief Gets the produced number of associated Legendre polynomials.
    *
    * \return Number of associated Legendre polynomials this generator

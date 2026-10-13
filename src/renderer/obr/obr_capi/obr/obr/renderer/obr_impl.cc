@@ -41,7 +41,8 @@ ObrImpl::ObrImpl(int buffer_size_per_channel, int sampling_rate)
       head_tracking_enabled_(false),
       limiter_enabled_(true),
       world_rotation_(WorldRotation()),
-      fft_manager_(buffer_size_per_channel_) {
+      fft_manager_(buffer_size_per_channel_),
+      group_output_(kNumBinauralChannels, buffer_size_per_channel_) {
   ABSL_CHECK_GT(buffer_size_per_channel, 0)
       << "Buffer size per channel must be greater than 0.";
   ABSL_CHECK_GT(sampling_rate_, 0) << "Sampling rate must be greater than 0.";
@@ -203,18 +204,15 @@ void ObrImpl::Process(const AudioBuffer& input_buffer,
     return;
   }
 
-  // Create a temporary buffer for each group's output.
-  AudioBuffer group_output(kNumBinauralChannels, buffer_size_per_channel_);
-
   // Process each processing group.
   for (auto& group : processing_groups_) {
-    group_output.Clear();
+    group_output_.Clear();
     group.Process(input_buffer, audio_elements_, head_tracking_enabled_,
-                  world_rotation_, &group_output);
+                  world_rotation_, &group_output_);
 
     // Add this group's binaural output to the main output buffer.
-    (*output_buffer)[0] += group_output[0];
-    (*output_buffer)[1] += group_output[1];
+    (*output_buffer)[0] += group_output_[0];
+    (*output_buffer)[1] += group_output_[1];
   }
 
   // Peak limit the output if enabled.

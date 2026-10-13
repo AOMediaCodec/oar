@@ -255,6 +255,10 @@ class ObrImpl {
   // TODO(b/468218887): Provide an option to disable peak limiting.
   // Peak limiter (applied to final output).
   std::unique_ptr<PeakLimiter> peak_limiter_;
+
+  // Each processing group's binaural output in `Process()`, allocated in the
+  // constructor so that processing does not allocate.
+  AudioBuffer group_output_;
 };
 
 }  // namespace obr

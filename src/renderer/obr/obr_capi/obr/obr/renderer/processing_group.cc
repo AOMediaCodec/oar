@@ -123,8 +123,9 @@ void ProcessingGroup::Process(
   ambisonic_mix_bed_head_locked_.Clear();
 
   // PASS 1: Process world-locked elements (head_locked = false)
-  const std::vector<size_t> world_locked_indices =
-      GetAmbisonicEncoderSourceChannelIndices(audio_elements, false);
+  GetAmbisonicEncoderSourceChannelIndices(audio_elements, false,
+                                          &world_locked_indices_);
+  const std::vector<size_t>& world_locked_indices = world_locked_indices_;
 
   if (!world_locked_indices.empty() && ambisonic_encoder_ != nullptr) {
     // Copy selected channels from input buffer to encoder input buffer.
@@ -151,8 +152,9 @@ void ProcessingGroup::Process(
   }
 
   // PASS 2: Process head-locked elements (head_locked = true)
-  const std::vector<size_t> head_locked_indices =
-      GetAmbisonicEncoderSourceChannelIndices(audio_elements, true);
+  GetAmbisonicEncoderSourceChannelIndices(audio_elements, true,
+                                          &head_locked_indices_);
+  const std::vector<size_t>& head_locked_indices = head_locked_indices_;
 
   if (!head_locked_indices.empty() && ambisonic_encoder_ != nullptr) {
     // Copy selected channels from input buffer to encoder input buffer.
@@ -199,10 +201,15 @@ void ProcessingGroup::Process(
 
 absl::Status ProcessingGroup::UpdateAmbisonicEncoder(
     std::vector<AudioElementConfig>& audio_elements) {
-  // Get encoder source indices to determine if we need an encoder.
-  const auto indices = GetAmbisonicEncoderSourceChannelIndices(audio_elements);
+  // Count the encoder sources to determine if we need an encoder.
+  const size_t num_sources =
+      GetNumberOfAmbisonicEncoderSourceChannels(audio_elements);
 
-  if (indices.empty()) {
+  // `Process()` fills the index lists within this capacity.
+  world_locked_indices_.reserve(num_sources);
+  head_locked_indices_.reserve(num_sources);
+
+  if (num_sources == 0) {
     // No sources to encode, so no encoder needed.
     ambisonic_encoder_.reset();
     ambisonic_encoder_input_buffer_ = AudioBuffer();
@@ -211,11 +218,11 @@ absl::Status ProcessingGroup::UpdateAmbisonicEncoder(
 
   // Initialize or reinitialize encoder if source count changed.
   if (ambisonic_encoder_ == nullptr ||
-      ambisonic_encoder_input_buffer_.num_channels() != indices.size()) {
+      ambisonic_encoder_input_buffer_.num_channels() != num_sources) {
     ambisonic_encoder_input_buffer_ =
-        AudioBuffer(indices.size(), buffer_size_per_channel_);
-    ambisonic_encoder_ = std::make_unique<AmbisonicEncoder>(
-        indices.size(), key_.ambisonic_order);
+        AudioBuffer(num_sources, buffer_size_per_channel_);
+    ambisonic_encoder_ =
+        std::make_unique<AmbisonicEncoder>(num_sources, key_.ambisonic_order);
   }
 
   // Update Ambisonic encoder settings.
@@ -243,38 +250,25 @@ absl::Status ProcessingGroup::UpdateAmbisonicEncoder(
   return absl::OkStatus();
 }
 
-std::vector<size_t> ProcessingGroup::GetAmbisonicEncoderSourceChannelIndices(
+size_t ProcessingGroup::GetNumberOfAmbisonicEncoderSourceChannels(
     const std::vector<AudioElementConfig>& audio_elements) const {
-  std::vector<size_t> source_channel_indices;
-  // Reserve capacity based on estimated number of channels to avoid
-  // reallocations.
-  size_t estimated_channels = 0;
+  size_t num_channels = 0;
   for (size_t ae_index : audio_element_indices_) {
     const auto& audio_element = audio_elements[ae_index];
     if (IsLoudspeakerLayoutType(audio_element.GetType()) ||
         IsObjectType(audio_element.GetType())) {
-      estimated_channels += audio_element.GetNumberOfInputChannels();
+      num_channels += audio_element.GetNumberOfInputChannels();
     }
   }
-  source_channel_indices.reserve(estimated_channels);
-
-  for (size_t ae_index : audio_element_indices_) {
-    const auto& audio_element = audio_elements[ae_index];
-    if (IsLoudspeakerLayoutType(audio_element.GetType()) ||
-        IsObjectType(audio_element.GetType())) {
-      for (size_t i = 0; i < audio_element.GetNumberOfInputChannels(); ++i) {
-        source_channel_indices.push_back(audio_element.GetFirstChannelIndex() +
-                                         i);
-      }
-    }
-  }
-  return source_channel_indices;
+  return num_channels;
 }
 
-std::vector<size_t> ProcessingGroup::GetAmbisonicEncoderSourceChannelIndices(
+void ProcessingGroup::GetAmbisonicEncoderSourceChannelIndices(
     const std::vector<AudioElementConfig>& audio_elements,
-    bool filter_head_locked) const {
-  std::vector<size_t> source_channel_indices;
+    bool filter_head_locked, std::vector<size_t>* indices) const {
+  ABSL_CHECK_NE(indices, nullptr);
+  std::vector<size_t>& source_channel_indices = *indices;
+  source_channel_indices.clear();
 
   for (size_t ae_index : audio_element_indices_) {
     const auto& audio_element = audio_elements[ae_index];
@@ -292,8 +286,6 @@ std::vector<size_t> ProcessingGroup::GetAmbisonicEncoderSourceChannelIndices(
       }
     }
   }
-
-  return source_channel_indices;
 }
 
 }  // namespace obr

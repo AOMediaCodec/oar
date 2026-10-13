@@ -38,6 +38,25 @@ AmbisonicEncoder::AmbisonicEncoder(size_t number_of_input_channels,
   encoding_matrix_ =
       Eigen::MatrixXf::Zero(static_cast<int>(number_of_output_channels_),
                             static_cast<int>(number_of_input_channels_));
+
+  // Size the working storage of `ProcessPlanarAudioData()`.
+  associated_legendre_polynomials_.reserve(alp_generator_.GetNumValues());
+  sh_coeffs_.assign(number_of_output_channels_, 0.0f);
+  column_start_.assign(
+      number_of_input_channels_,
+      Eigen::VectorXf::Zero(static_cast<int>(number_of_output_channels_)));
+  column_end_.assign(
+      number_of_input_channels_,
+      Eigen::VectorXf::Zero(static_cast<int>(number_of_output_channels_)));
+  needs_interpolation_.assign(number_of_input_channels_, false);
+  encoding_frame_ =
+      Eigen::MatrixXf::Zero(static_cast<int>(number_of_output_channels_),
+                            static_cast<int>(number_of_input_channels_));
+  interpolated_column_ =
+      Eigen::VectorXf::Zero(static_cast<int>(number_of_output_channels_));
+
+  // `SetSource()` adds at most one entry per input channel.
+  sources_.reserve(number_of_input_channels_);
 }
 
 void AmbisonicEncoder::SetSource(size_t input_channel, float gain,
@@ -131,17 +150,10 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
 
   // Compute a per-frame encoding matrix (output x input) by linearly
   // interpolating each source's parameters across the block. This avoids
-  // clicks when object positions change quickly.
-  Eigen::MatrixXf last_encoding =
-      Eigen::MatrixXf::Zero(static_cast<int>(number_of_output_channels_),
-                            static_cast<int>(number_of_input_channels_));
-
-  // Precompute start and target encoding columns for each input channel.
-  std::vector<Eigen::VectorXf> column_start(number_of_input_channels_);
-  std::vector<Eigen::VectorXf> column_end(number_of_input_channels_);
-
-  // Track which input channels actually need per-frame interpolation.
-  std::vector<bool> needs_interpolation(number_of_input_channels_, false);
+  // clicks when object positions change quickly. The start and target
+  // encoding columns of each input channel go into `column_start_` and
+  // `column_end_`, and `needs_interpolation_` tracks which input channels
+  // actually need per-frame interpolation.
 
   // Helper lambda to compare two sets of source parameters for equality.
   auto params_equal = [&](const SingleSourceParams& a,
@@ -169,10 +181,9 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
 
   // For each input channel, compute the encoding matrix column at the start.
   for (size_t in_ch = 0; in_ch < number_of_input_channels_; ++in_ch) {
-    column_start[in_ch] =
-        Eigen::VectorXf::Zero(static_cast<int>(number_of_output_channels_));
-    column_end[in_ch] =
-        Eigen::VectorXf::Zero(static_cast<int>(number_of_output_channels_));
+    column_start_[in_ch].setZero();
+    column_end_[in_ch].setZero();
+    needs_interpolation_[in_ch] = false;
 
     auto it = sources_.find(in_ch);
     if (it == sources_.end()) {
@@ -189,31 +200,31 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
       }
 
       // Compute spherical harmonic coefficients for this direction.
-      std::vector<float> sh_coeffs(number_of_output_channels_);
-      GetShCoeffs(p.azimuth, p.elevation, ambisonic_order_, sh_coeffs);
+      std::fill(sh_coeffs_.begin(), sh_coeffs_.end(), 0.0f);
+      GetShCoeffs(p.azimuth, p.elevation, ambisonic_order_, sh_coeffs_);
 
       // Apply SH damping per-degree if needed. Use normalized_head_radius
       // = 0.1f (i.e. damping applies for distance < 0.1).
-      ApplyWithinHeadSHCoefficientsDamping(p.distance, 0.1f, sh_coeffs);
+      ApplyWithinHeadSHCoefficientsDamping(p.distance, 0.1f, sh_coeffs_);
 
       // Scale by gain and write into the Eigen vector.
       for (size_t out_ch = 0; out_ch < number_of_output_channels_; ++out_ch) {
-        col(static_cast<int>(out_ch)) = sh_coeffs.at(out_ch) * p.gain;
+        col(static_cast<int>(out_ch)) = sh_coeffs_.at(out_ch) * p.gain;
       }
     };
 
     // Always compute the target column.
-    fill_column(source_properties.target, column_end[in_ch]);
+    fill_column(source_properties.target, column_end_[in_ch]);
 
     // Decide whether this source needs interpolation across frames.
     if (!params_equal(source_properties.current, source_properties.target)) {
       // Only compute the start/current column if parameters differ.
-      fill_column(source_properties.current, column_start[in_ch]);
-      needs_interpolation[in_ch] = true;
+      fill_column(source_properties.current, column_start_[in_ch]);
+      needs_interpolation_[in_ch] = true;
     } else {
       // Parameters equal: reuse the target column as the start.
-      column_start[in_ch] = column_end[in_ch];
-      needs_interpolation[in_ch] = false;
+      column_start_[in_ch] = column_end_[in_ch];
+      needs_interpolation_[in_ch] = false;
     }
   }
 
@@ -221,7 +232,7 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
   // static encoding matrix and reuse it for all frames.
   bool any_needs_interpolation = false;
   for (size_t i = 0; i < number_of_input_channels_; ++i) {
-    if (needs_interpolation[i]) {
+    if (needs_interpolation_[i]) {
       any_needs_interpolation = true;
       break;
     }
@@ -230,28 +241,26 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
   if (!any_needs_interpolation) {
     // Interpolation disabled: build one static encoding matrix for the
     // whole block from the (already computed) target columns and reuse it
-    // for every frame. This avoids per-frame interpolation and copies.
-    Eigen::MatrixXf static_encoding(
-        static_cast<int>(number_of_output_channels_),
-        static_cast<int>(number_of_input_channels_));
-    static_encoding.setZero();
+    // for every frame. This avoids per-frame interpolation and copies. It is
+    // built in `encoding_matrix_`, which keeps it after the block.
+    encoding_matrix_.setZero();
     for (size_t in_ch = 0; in_ch < number_of_input_channels_; ++in_ch) {
-      if (column_end[in_ch].isZero(0)) {
+      if (column_end_[in_ch].isZero(0)) {
         continue;
       }
       for (int out_ch = 0;
            out_ch < static_cast<int>(number_of_output_channels_); ++out_ch) {
-        static_encoding(out_ch, static_cast<int>(in_ch)) =
-            column_end[in_ch](out_ch);
+        encoding_matrix_(out_ch, static_cast<int>(in_ch)) =
+            column_end_[in_ch](out_ch);
       }
     }
 
+    // The output buffer does not alias the matrix or the input, so the
+    // product is written in place rather than through a temporary.
     for (size_t frame = 0; frame < num_frames; ++frame) {
-      encoded_buffer.col(static_cast<int>(frame)) =
-          static_encoding * unencoded_buffer.col(static_cast<int>(frame));
+      encoded_buffer.col(static_cast<int>(frame)).noalias() =
+          encoding_matrix_ * unencoded_buffer.col(static_cast<int>(frame));
     }
-
-    last_encoding = static_encoding;
   } else {
     // Some channels need interpolation: perform per-frame interpolation so
     // parameters ramp smoothly across the block.
@@ -262,45 +271,50 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
         alpha = static_cast<float>(frame) / static_cast<float>(num_frames - 1);
       }
 
-      Eigen::MatrixXf encoding_frame(
-          static_cast<int>(number_of_output_channels_),
-          static_cast<int>(number_of_input_channels_));
-      encoding_frame.setZero();
+      encoding_frame_.setZero();
 
-      // Build encoding_frame column-by-column for each input/source by
+      // Build encoding_frame_ column-by-column for each input/source by
       // interpolating the precomputed start/end columns.
       for (size_t in_ch = 0; in_ch < number_of_input_channels_; ++in_ch) {
         // If both start and end are zeros, skip.
-        if (column_start[in_ch].isZero(0) && column_end[in_ch].isZero(0)) {
+        if (column_start_[in_ch].isZero(0) && column_end_[in_ch].isZero(0)) {
           continue;
         }
 
         // Interpolate column values directly in coefficient space only if
         // this channel needs interpolation. Otherwise, use the target column
         // directly to avoid per-frame arithmetic.
-        Eigen::VectorXf col;
-        if (needs_interpolation[in_ch]) {
-          col = column_start[in_ch] +
-                alpha * (column_end[in_ch] - column_start[in_ch]);
+        if (needs_interpolation_[in_ch]) {
+          interpolated_column_ =
+              column_start_[in_ch] +
+              alpha * (column_end_[in_ch] - column_start_[in_ch]);
         } else {
-          col = column_end[in_ch];
+          interpolated_column_ = column_end_[in_ch];
         }
 
         // Copy into the encoding frame column.
         for (int out_ch = 0;
              out_ch < static_cast<int>(number_of_output_channels_); ++out_ch) {
-          encoding_frame(out_ch, static_cast<int>(in_ch)) = col(out_ch);
+          encoding_frame_(out_ch, static_cast<int>(in_ch)) =
+              interpolated_column_(out_ch);
         }
       }
 
       // Multiply the per-frame encoding matrix with the single-frame input
       // column to produce the encoded output for this frame index.
       // Note: use .col() with the actual frame index (frame) mapping into the
-      // row-major mapped buffers.
-      encoded_buffer.col(static_cast<int>(frame)) =
-          encoding_frame * unencoded_buffer.col(static_cast<int>(frame));
+      // row-major mapped buffers. The output buffer does not alias the
+      // matrix or the input, so the product is written in place.
+      encoded_buffer.col(static_cast<int>(frame)).noalias() =
+          encoding_frame_ * unencoded_buffer.col(static_cast<int>(frame));
+    }
 
-      last_encoding = encoding_frame;  // keep for later update
+    // Keep the last frame's matrix (zero for an empty block) so code that
+    // expects a static encoding matrix still has a reasonable value.
+    if (num_frames > 0) {
+      encoding_matrix_ = encoding_frame_;
+    } else {
+      encoding_matrix_.setZero();
     }
   }
 
@@ -309,10 +323,6 @@ void AmbisonicEncoder::ProcessPlanarAudioData(const AudioBuffer& input_buffer,
   for (auto& kv : sources_) {
     kv.second.current = kv.second.target;
   }
-
-  // Update the stored encoding matrix to the last frame's matrix so code that
-  // expects a static encoding matrix still has a reasonable value.
-  encoding_matrix_ = last_encoding;
 
   // Audio has now been rendered; subsequent `SetSource()` updates ramp from
   // the previously audible parameters.
@@ -325,8 +335,8 @@ void AmbisonicEncoder::GetShCoeffs(float azimuth, float elevation,
   const float azimuth_rad = azimuth * kRadiansFromDegrees;
   const float elevation_rad = elevation * kRadiansFromDegrees;
 
-  std::vector<float> associated_legendre_polynomials_temp_ =
-      alp_generator_.Generate(std::sin(elevation_rad));
+  alp_generator_.Generate(std::sin(elevation_rad),
+                          &associated_legendre_polynomials_);
   // Compute the actual spherical harmonics using the generated polynomials.
   for (int degree = 0; degree <= ambisonic_order; degree++) {
     for (int order = -degree; order <= degree; order++) {
@@ -339,11 +349,10 @@ void AmbisonicEncoder::GetShCoeffs(float azimuth, float elevation,
       const float angle = static_cast<float>(order) * azimuth_rad;
       const float last_term = (order >= 0) ? std::cos(angle) : std::sin(-angle);
 
-      coeffs.at(row) =
-          Sn3dNormalization(degree, order) *
-          associated_legendre_polynomials_temp_[alp_generator_.GetIndex(
-              degree, std::abs(order))] *
-          last_term;
+      coeffs.at(row) = Sn3dNormalization(degree, order) *
+                       associated_legendre_polynomials_[alp_generator_.GetIndex(
+                           degree, std::abs(order))] *
+                       last_term;
     }
   }
 }
