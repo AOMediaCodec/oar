@@ -265,6 +265,10 @@ void metadata_item_elapse(metadata_item_t *item, uint32_t samples_per_channel) {
   debug("metadata item %u S: elapsed %u, duration %d, elapse %u", item->id,
         item->start, item->duration, samples_per_channel);
 
+  /* Whether the queued blocks cover a sample not yet rendered. Blocks of zero
+   * duration cover none, like an empty queue, which returns above: rendering
+   * past them is not an underrun. */
+  const int covers_samples = item->duration > item->start;
   item->start += samples_per_channel;
   metadatas = item->metadatas;
 
@@ -286,10 +290,12 @@ void metadata_item_elapse(metadata_item_t *item, uint32_t samples_per_channel) {
   }
 
   if (item->start > item->duration) {
-    warn(
-        "Metadata item %d has negative duration (%d vs %d). reset metadata "
-        "item.",
-        item->id, item->start, item->duration);
+    if (covers_samples) {
+      warn(
+          "Metadata item %u has negative duration (%u vs %u). reset metadata "
+          "item.",
+          item->id, item->start, item->duration);
+    }
     item->duration = item->start = 0;
   }
 
