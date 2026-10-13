@@ -27,8 +27,10 @@ typedef struct OlrContext {
   uint32_t num_objects;
   olr_layout_t layout;
   metadata_block_t *metadata_blocks;
+  /* Where each object's next metadata block starts, in samples. */
   uint64_t *metadata_block_durations;
-  int offset;
+  /* Samples rendered so far. */
+  uint64_t offset;
 } olr_context_t;
 
 static int _close(renderer_library_context_t *ctx);
@@ -182,10 +184,18 @@ static int _metadata_update(renderer_library_context_t *ctx, uint32_t index,
       }
 
       for (uint32_t i = 0; i < n; i++) {
-        olr->metadata_blocks[i].start = olr->metadata_block_durations[i];
+        /* A block starts where the object's previous block ended. When
+         * renders without a position have moved past that point, it starts
+         * at the next sample to render instead: those samples were rendered
+         * without the object, and a block starting before them would be
+         * dropped as an underrun, together with every later block. */
+        uint64_t start = olr->metadata_block_durations[i];
+        if (start < olr->offset) start = olr->offset;
+        olr->metadata_blocks[i].start = start;
         olr->metadata_blocks[i].duration =
             metadata->duration > 0 ? metadata->duration : 0;
-        olr->metadata_block_durations[i] += olr->metadata_blocks[i].duration;
+        olr->metadata_block_durations[i] =
+            start + olr->metadata_blocks[i].duration;
 
         olr->metadata_blocks[i].azimuth =
             metadata->object_positions.polar_positions[i].azimuth;
