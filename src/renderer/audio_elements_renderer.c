@@ -102,6 +102,43 @@ static int audio_elements_renderer_apply_frame_positions(
   return ck_oar_ok;
 }
 
+/* Sizes the staging block for channels_count channels after an element is
+ * added or removed, keeping the data of the existing channels and zeroing
+ * the added ones. add_element() and remove_element() call it on the
+ * configuring thread, so that add_data() on the render thread does not
+ * allocate; add_data() calls it again only if it failed there. */
+static int _update_staging_block(audio_elements_renderer_t *self) {
+  const uint32_t samples = self->base.ctx.samples_per_frame;
+
+  if (!self->elements_updated) return ck_oar_ok;
+
+  if (self->channels_count) {
+    if (!self->base.block.data) {
+      debug("channels %d, samples %d", self->channels_count, samples);
+      self->base.block.data =
+          def_mallocz(float, (self->channels_count * samples));
+      if (!self->base.block.data) {
+        return ck_oar_error_nomem;
+      }
+      self->base.block.samples_per_channel = samples;
+    } else if (self->base.block.channels < self->channels_count) {
+      /* A new element was added after the initial allocation, increasing
+       * channels_count. Realloc to fit all elements' channels. */
+      float *data = def_realloc(self->base.block.data, float,
+                                (self->channels_count * samples));
+
+      if (!data) return ck_oar_error_nomem;
+      self->base.block.data = data;
+      memset((self->base.block.data + self->base.block.channels * samples), 0,
+             ((self->channels_count - self->base.block.channels) * samples *
+              sizeof(float)));
+    }
+  }
+  self->base.block.channels = self->channels_count;
+  self->elements_updated = 0;
+  return ck_oar_ok;
+}
+
 audio_elements_renderer_t *audio_elements_renderer_new(
     const oar_config_t *oar_config, uint32_t id,
     renderer_library_manager_t *manager, const uint32_t *metadata_samples_ref) {
@@ -221,6 +258,8 @@ int audio_elements_renderer_add_element(
       self->channels_count += rid_channels_count(ctx->rid);
       info("Added element %u, index %d, channels %d", element_id, ctx->index,
            self->channels_count);
+      if (_update_staging_block(self) != ck_oar_ok)
+        warn("Failed to size the staging block; add_data() retries.");
     }
   }
 
@@ -281,15 +320,16 @@ int audio_elements_renderer_remove_element(audio_renderer_base_t *base,
   self->channels_count -= removed_channels;
   self->elements_updated = 1;
 
-  /* Free the staging buffer to prevent stale data from being rendered.
-   * The next add_data call will reallocate it with the updated channels_count.
-   */
+  /* Free the staging buffer to prevent stale data from being rendered, and
+   * allocate it zeroed for the updated channels_count. */
   if (self->base.block.data) {
     def_free(self->base.block.data);
     self->base.block.data = NULL;
     self->base.block.channels = 0;
     self->base.block.samples_per_channel = 0;
   }
+  if (_update_staging_block(self) != ck_oar_ok)
+    warn("Failed to size the staging block; add_data() retries.");
 
   info("Removed element %u from binaural renderer, remaining elements: %d",
        element_id, vector_size(self->elements));
@@ -364,32 +404,8 @@ int audio_elements_renderer_add_data(audio_renderer_base_t *base,
   }
 
   if (self->elements_updated) {
-    if (!self->base.block.data) {
-      debug("channels %d, samples %d", self->channels_count,
-            block->samples_per_channel);
-      self->base.block.data = def_mallocz(
-          float, (self->channels_count * block->samples_per_channel));
-      if (!self->base.block.data) {
-        return ck_oar_error_nomem;
-      }
-      self->base.block.samples_per_channel = block->samples_per_channel;
-    } else if (block->channels < self->channels_count) {
-      /* A new element was added after the initial allocation, increasing
-       * channels_count. Realloc to fit all elements' channels. */
-      float *data =
-          def_realloc(self->base.block.data, float,
-                      (self->channels_count * block->samples_per_channel));
-
-      if (!data) return ck_oar_error_nomem;
-      self->base.block.data = data;
-      memset((self->base.block.data +
-              self->base.block.channels * self->base.block.samples_per_channel),
-             0,
-             ((self->channels_count - self->base.block.channels) *
-              self->base.block.samples_per_channel * sizeof(float)));
-    }
-    self->base.block.channels = self->channels_count;
-    self->elements_updated = 0;
+    int ret = _update_staging_block(self);
+    if (ret != ck_oar_ok) return ret;
   }
 
   memcpy(self->base.block.data +
@@ -414,6 +430,9 @@ int audio_elements_renderer_apply_gains(audio_renderer_base_t *base,
                                         oar_audio_block_t *block) {
   audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
   if (!self) return ck_oar_error_inval;
+  /* The staging block was not sized for the current elements (the
+   * allocation at add or remove failed and add_data() has not retried it). */
+  if (self->elements_updated) return ck_oar_error_nomem;
   int n = vector_size(self->elements);
 
   for (int i = 0; i < n; i++) {
@@ -445,6 +464,9 @@ int audio_elements_renderer_render(audio_renderer_base_t *base,
   audio_elements_renderer_t *self = def_audio_elements_renderer_ptr(base);
   int ret = ck_oar_error_inval;
   if (!self || !output_block) return ck_oar_error_inval;
+  /* See apply_gains(): rendering a staging block that is smaller than the
+   * elements' channels would read past its end. */
+  if (self->elements_updated) return ck_oar_error_nomem;
 
   // Frame-granularity position update: forward object-based element positions
   // to OBR before rendering. OBR fixes buffer_size_per_channel at creation
