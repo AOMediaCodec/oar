@@ -72,6 +72,7 @@ static int audio_elements_renderer_apply_frame_positions(
 
     uint32_t sample_position = ctx->rendering_metadata.positions->start;
     uint32_t accumulated_duration = 0;
+    oar_metadata_t current_metadata_storage;
     oar_metadata_t *current_metadata = 0;
 
     int m = queue_length(ctx->rendering_metadata.positions->metadatas);
@@ -84,8 +85,10 @@ static int audio_elements_renderer_apply_frame_positions(
       if (sample_position >= accumulated_duration &&
           sample_position < accumulated_duration + metadata->duration) {
         uint32_t relative_pos = sample_position - accumulated_duration;
-        current_metadata = metadata_constant_polar_positions_create(
-            metadata, relative_pos, self->base.block.samples_per_channel);
+        metadata_constant_polar_positions_fill(
+            &current_metadata_storage, metadata, relative_pos,
+            self->base.block.samples_per_channel);
+        current_metadata = &current_metadata_storage;
         break;
       }
       accumulated_duration += metadata->duration;
@@ -94,7 +97,6 @@ static int audio_elements_renderer_apply_frame_positions(
     if (current_metadata) {
       if (self->base.lib && self->base.lib->metadata_update)
         self->base.lib->metadata_update(&self->base.ctx, i, current_metadata);
-      metadata_delete(current_metadata);
     }
   }
   return ck_oar_ok;

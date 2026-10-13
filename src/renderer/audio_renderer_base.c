@@ -358,10 +358,11 @@ int audio_block_sub_frames_apply_gain(oar_audio_block_t *block,
   return ck_oar_ok;
 }
 
-oar_metadata_t *metadata_constant_polar_positions_create(
-    const oar_metadata_t *metadata, uint32_t relative_pos, uint32_t duration) {
-  oar_metadata_t *constant_metadata = def_mallocz(oar_metadata_t, 1);
-  if (!constant_metadata) return NULL;
+void metadata_constant_polar_positions_fill(oar_metadata_t *constant_metadata,
+                                            const oar_metadata_t *metadata,
+                                            uint32_t relative_pos,
+                                            uint32_t duration) {
+  memset(constant_metadata, 0, sizeof(oar_metadata_t));
 
   constant_metadata->type = ck_metadata_object_positions;
   constant_metadata->duration = duration;
@@ -483,8 +484,6 @@ oar_metadata_t *metadata_constant_polar_positions_create(
       }
     }
   }
-
-  return constant_metadata;
 }
 
 void audio_renderer_base_uninit(audio_renderer_base_t *base) {

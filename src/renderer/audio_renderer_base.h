@@ -113,8 +113,12 @@ int audio_block_sub_frames_apply_gain(oar_audio_block_t *block,
                                       metadata_item_t *gain_item,
                                       uint32_t sub_frame_samples);
 
-oar_metadata_t *metadata_constant_polar_positions_create(
-    const oar_metadata_t *metadata, uint32_t relative_pos, uint32_t duration);
+/* Writes into constant_metadata the constant polar positions metadata at
+ * relative_pos of metadata, covering duration samples. */
+void metadata_constant_polar_positions_fill(oar_metadata_t *constant_metadata,
+                                            const oar_metadata_t *metadata,
+                                            uint32_t relative_pos,
+                                            uint32_t duration);
 
 void audio_renderer_base_uninit(audio_renderer_base_t *base);
 void audio_renderer_delete(audio_renderer_base_t *base);
