@@ -146,13 +146,38 @@ class ProcessingGroup {
   BinauralFilterProfile GetFilterProfile() const { return key_.filter_profile; }
 
  private:
-  /*!\brief Get the number of source channels for the Ambisonic encoder.
+  /*!\brief Ambisonic encoder for the world-locked or the head-locked
+   * loudspeaker layout and object channels of this group.
+   */
+  struct EncoderPass {
+    std::unique_ptr<AmbisonicEncoder> encoder;
+    AudioBuffer input_buffer;
+  };
+
+  /*!\brief Get the number of source channels for the Ambisonic encoder of
+   * the world-locked or the head-locked elements.
    *
    * \param audio_elements Reference to all audio elements.
-   * \return Number of input channels of all sources.
+   * \param head_locked If true, count the head-locked elements' channels;
+   *        if false, the world-locked elements'.
+   * \return Number of input channels of the sources.
    */
   size_t GetNumberOfAmbisonicEncoderSourceChannels(
-      const std::vector<AudioElementConfig>& audio_elements) const;
+      const std::vector<AudioElementConfig>& audio_elements,
+      bool head_locked) const;
+
+  /*!\brief Creates or resizes the encoder of one pass and sets its sources.
+   *
+   * \param audio_elements Reference to all audio elements.
+   * \param head_locked If true, the head-locked pass; if false, the
+   *        world-locked pass.
+   * \param pass The pass's encoder and input buffer.
+   * \param indices The pass's source channel index list, whose capacity is
+   *        reserved for the pass's sources.
+   */
+  void UpdateEncoderPass(std::vector<AudioElementConfig>& audio_elements,
+                         bool head_locked, EncoderPass* pass,
+                         std::vector<size_t>* indices);
 
   /*!\brief Get source channel indices for the Ambisonic encoder, filtered by
    * head-locked status.
@@ -184,9 +209,13 @@ class ProcessingGroup {
   // Ambisonic mix bed for head-locked elements (never rotated).
   AudioBuffer ambisonic_mix_bed_head_locked_;
 
-  // Ambisonic encoder for loudspeaker layout and object types.
-  std::unique_ptr<AmbisonicEncoder> ambisonic_encoder_;
-  AudioBuffer ambisonic_encoder_input_buffer_;
+  // Ambisonic encoders for the loudspeaker layout and object channels of the
+  // world-locked and of the head-locked elements. Each holds only its own
+  // elements' channels as sources, in the order of `audio_element_indices_`,
+  // so the channels a pass copies to its encoder's inputs 0 to k-1 are
+  // encoded with their own positions.
+  EncoderPass world_locked_encoder_;
+  EncoderPass head_locked_encoder_;
 
   // Encoder source channel indices of the world-locked and head-locked
   // elements, filled by `Process()` within the capacity reserved by

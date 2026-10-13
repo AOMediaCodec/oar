@@ -47,6 +47,7 @@ oar_add_test(test_olr_block_storage)
 # Includes internal headers by their repository paths, as in Bazel.
 target_include_directories(test_olr_block_storage PRIVATE ${PROJECT_SOURCE_DIR})
 oar_add_test(test_binaural_add_remove)
+oar_add_test(test_binaural_mixed_lock)
 
 # The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
 # into the library when OAR_ENABLE_HOA_LFE is ON.
