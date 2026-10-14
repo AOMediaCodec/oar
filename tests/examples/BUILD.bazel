@@ -108,3 +108,38 @@ cc_test(
     ],
 )
 
+cc_test(
+    name = "test_render_scratch",
+    srcs = ["test_render_scratch.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
+
+cc_test(
+    name = "test_metadata_reuse",
+    srcs = ["test_metadata_reuse.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
+
+cc_test(
+    name = "test_olr_block_storage",
+    srcs = ["test_olr_block_storage.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)
+
+cc_test(
+    name = "test_binaural_add_remove",
+    srcs = ["test_binaural_add_remove.c"],
+    deps = [
+        ":oar_test_common",
+        "//:oar",
+    ],
+)

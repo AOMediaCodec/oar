@@ -67,24 +67,15 @@ int _dbap_panner_2d_calculate_gains(dbap_panner_2d_t *self,
                                     auto_float_t distance, auto_float_t *gains,
                                     int n) {
   int s;
-  auto_float_t gains_norm = 0.f, *distances = 0, *weights = 0, weights_sum = 0;
-  cartesian_position_t *np_speakers, projected_source;
+  auto_float_t gains_norm = 0.f, weights_sum = 0;
+  auto_float_t distances[def_max_speakers], weights[def_max_speakers];
+  cartesian_position_t np_speakers[def_max_speakers], projected_source;
   vector_t *speakers = self->target_speakers;
 
   for (int i = 0; i < n; ++i) gains[i] = 0.0f;
 
   s = vector_size(speakers);
-
-  np_speakers = def_mallocz(cartesian_position_t, s);
-  distances = def_mallocz(auto_float_t, s);
-  weights = def_mallocz(auto_float_t, s);
-
-  if (!np_speakers || !distances || !weights) {
-    def_free(np_speakers);
-    def_free(distances);
-    def_free(weights);
-    return -12;
-  }
+  if (s > def_max_speakers) return -22;
 
   for (int i = 0; i < s; ++i) {
     speaker_position_t *sp = def_value_wrap_ptr(vector_at(speakers, i));
@@ -105,10 +96,6 @@ int _dbap_panner_2d_calculate_gains(dbap_panner_2d_t *self,
   for (int i = 0; i < s; ++i) gains[i] = weights[i] / weights_sum;
   gains_norm = nc_linalg_norm(gains, s);
   for (int i = 0; i < s; ++i) gains[i] /= gains_norm;
-
-  def_free(np_speakers);
-  def_free(distances);
-  def_free(weights);
 
   return 0;
 }

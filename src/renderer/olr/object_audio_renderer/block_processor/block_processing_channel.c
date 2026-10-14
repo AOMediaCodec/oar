@@ -19,16 +19,23 @@
 #include "cdeque.h"
 #include "clog.h"
 #include "cvalue.h"
-#include "cvector.h"
 #include "definitions.h"
 #include "interpret_object_metadata.h"
 #include "gain_calculator/gain_calculator.h"
 #include "object_based_audio_renderer.h"
 #include "processing_block.h"
 
+/* The metadata blocks a channel holds at creation; add_metadata() doubles
+ * the ring when a caller queues more blocks than it holds. */
+#define def_metadata_ring_size 8
+
 struct BlockProcessingChannel {
-  vector_t* metadata_blocks;
-  int iter;
+  /* Metadata blocks not yet interpreted, oldest first, in a ring of
+   * metadata_capacity blocks starting at metadata_head. */
+  metadata_block_t* metadata_blocks;
+  int metadata_capacity;
+  int metadata_head;
+  int metadata_count;
 
   interpret_object_metadata_t* interpret_object_metadata;
   deque_t* processing_queue;
@@ -41,10 +48,10 @@ static void _debug_print_metadata_block(metadata_block_t* metadata,
                                         const char* prefix);
 
 block_processing_channel_t* block_processing_channel_create(
-    layout_gain_calculator_t* gain_calculator) {
+    layout_gain_calculator_t* gain_calculator, uint64_t max_block_samples) {
   block_processing_channel_t* self = 0;
   interpret_object_metadata_t* interpret_object_metadata =
-      interpret_object_metadata_create(gain_calculator);
+      interpret_object_metadata_create(gain_calculator, max_block_samples);
   if (!interpret_object_metadata) return 0;
 
   self = def_mallocz(block_processing_channel_t, 1);
@@ -55,7 +62,7 @@ block_processing_channel_t* block_processing_channel_create(
 
   self->interpret_object_metadata = interpret_object_metadata;
 
-  self->metadata_blocks = vector_new();
+  self->metadata_blocks = def_mallocz(metadata_block_t, def_metadata_ring_size);
   if (!self->metadata_blocks) {
     error(
         "could not allocate memory for metadata blocks in block processing "
@@ -63,9 +70,11 @@ block_processing_channel_t* block_processing_channel_create(
     block_processing_channel_destroy(self);
     return 0;
   }
+  self->metadata_capacity = def_metadata_ring_size;
 
+  /* The queue holds one processing block at a time. */
   self->processing_queue = deque_new();
-  if (!self->processing_queue) {
+  if (!self->processing_queue || deque_reserve(self->processing_queue, 1) < 0) {
     block_processing_channel_destroy(self);
     return 0;
   }
@@ -77,12 +86,23 @@ int block_processing_channel_add_metadata(block_processing_channel_t* self,
                                           metadata_block_t* metadata) {
   if (!self || !metadata) return -22;
 
-  metadata_block_t* metadata_clone = calloc(1, sizeof(metadata_block_t));
-  if (!metadata_clone) return -12;
-  memcpy(metadata_clone, metadata, sizeof(metadata_block_t));
+  if (self->metadata_count == self->metadata_capacity) {
+    const int capacity = self->metadata_capacity * 2;
+    metadata_block_t* blocks = def_mallocz(metadata_block_t, capacity);
+    if (!blocks) return -12;
+    for (int i = 0; i < self->metadata_count; ++i) {
+      blocks[i] = self->metadata_blocks[(self->metadata_head + i) %
+                                        self->metadata_capacity];
+    }
+    free(self->metadata_blocks);
+    self->metadata_blocks = blocks;
+    self->metadata_capacity = capacity;
+    self->metadata_head = 0;
+  }
 
-  vector_push(self->metadata_blocks,
-              def_value_wrap_instance_ptr(metadata_clone));
+  self->metadata_blocks[(self->metadata_head + self->metadata_count) %
+                        self->metadata_capacity] = *metadata;
+  ++self->metadata_count;
 
   _debug_print_metadata_block(metadata, "Original ");
 
@@ -122,32 +142,36 @@ int block_processing_channel_process(block_processing_channel_t* self,
 
 void block_processing_channel_destroy(block_processing_channel_t* self) {
   if (!self) return;
-  if (self->metadata_blocks)
-    vector_free(self->metadata_blocks, def_default_free_ptr(free));
-  if (self->interpret_object_metadata)
-    interpret_object_metadata_destroy(self->interpret_object_metadata);
+  /* A queued processing block lives in the interpreter's storage, so the
+   * queue goes before the interpreter. */
   if (self->processing_queue)
     deque_free(self->processing_queue,
                def_default_free_ptr(__processing_block_destroy));
+  if (self->interpret_object_metadata)
+    interpret_object_metadata_destroy(self->interpret_object_metadata);
+  def_free(self->metadata_blocks);
   free(self);
 }
 
-static metadata_block_t* _next_metadata_block(
-    block_processing_channel_t* self) {
-  int num_metadata_blocks = vector_size(self->metadata_blocks);
-  if (self->iter >= num_metadata_blocks) return 0;
-  return def_value_wrap_ptr(vector_at(self->metadata_blocks, self->iter++));
+/* Takes the oldest metadata block out of the ring into *block. */
+static int _next_metadata_block(block_processing_channel_t* self,
+                                metadata_block_t* block) {
+  if (self->metadata_count == 0) return 0;
+  *block = self->metadata_blocks[self->metadata_head];
+  self->metadata_head = (self->metadata_head + 1) % self->metadata_capacity;
+  --self->metadata_count;
+  return 1;
 }
 
 static int _refil_processing_queue(block_processing_channel_t* self,
                                    int sample_rate, uint64_t start) {
   while (deque_is_empty(self->processing_queue)) {
-    metadata_block_t* block = _next_metadata_block(self);
+    metadata_block_t block;
     processing_block_t* processing_block = 0;
-    if (!block) return 0;
+    if (!_next_metadata_block(self, &block)) return 0;
 
     processing_block = interpret_object_metadata_process(
-        self->interpret_object_metadata, sample_rate, block);
+        self->interpret_object_metadata, sample_rate, &block);
     if (!processing_block) continue;
     if (processing_block->first_sample < start) {
       error(

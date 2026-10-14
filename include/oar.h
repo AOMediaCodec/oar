@@ -276,12 +276,15 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
  *            output->data must be allocated for at least
  *            oar_get_samples_per_channel() *
  *            oar_get_number_of_output_channels() floats.
- *            On return, output->samples_per_channel is set to
+ *            On success, output->samples_per_channel is set to
  *            oar_get_samples_per_channel().
  * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
  *            parameters (including channel mismatch, insufficient samples,
- *            no audio groups, or no data), ck_oar_error_nomem (-12) for
- *            memory allocation failure
+ *            no audio groups, no data, or a configuration with zero output
+ *            channels or zero samples per channel). oar_render() does not
+ *            return ck_oar_error_nomem: an element whose renderer fails,
+ *            for example on an allocation failure, is left out of the mix
+ *            and the call returns ck_oar_ok.
  * @note      When limiter is enabled, the first delay_size samples are
  *            zero-padded (priming). Use oar_get_limiter_delay() for
  *            latency compensation. Output length always equals

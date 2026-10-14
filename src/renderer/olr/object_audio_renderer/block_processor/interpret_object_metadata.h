@@ -19,8 +19,14 @@
 
 typedef struct InterpretObjectMetadata interpret_object_metadata_t;
 
+/* max_block_samples sizes the interpolation table for metadata blocks of
+ * up to that many samples; a longer block grows it. */
 interpret_object_metadata_t *interpret_object_metadata_create(
-    layout_gain_calculator_t *gain_calculator);
+    layout_gain_calculator_t *gain_calculator, uint64_t max_block_samples);
+/* Returns the processing block for `block`, or NULL when it covers no
+ * samples. The block lives in the interpreter's storage and uses the gain
+ * arrays the interpreter holds; both stay valid until the next process()
+ * call, and the caller must drop the block before that call. */
 processing_block_t *interpret_object_metadata_process(
     interpret_object_metadata_t *self, int sample_rate,
     metadata_block_t *block);
