@@ -91,6 +91,19 @@ typedef struct {
 #define TEST_ASSERT_NE(actual, unexpected, msg) \
   TEST_ASSERT((actual) != (unexpected), msg)
 
+/**
+ * Assert that @p cond is true. On failure, prints the printf-style @p fmt
+ * message and line number to stderr, then returns TEST_FAIL from the
+ * enclosing function. @p fmt must take at least one argument.
+ */
+#define TEST_ASSERTF(cond, fmt, ...)                                       \
+  do {                                                                     \
+    if (!(cond)) {                                                         \
+      fprintf(stderr, "FAIL: " fmt " (line %d)\n", __VA_ARGS__, __LINE__); \
+      return TEST_FAIL;                                                    \
+    }                                                                      \
+  } while (0)
+
 /** Skip the test when @p ret is exactly ck_oar_error_notsup: the optional
  *  feature under test (e.g. the binaural renderer) is not built in. Any other
  *  negative value is a real error and fails the test (printing the actual

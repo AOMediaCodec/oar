@@ -2386,12 +2386,7 @@ int IAMF_element_renderer_render_H2M(struct h2m_rdr_t *h2mMatrix, float *in[],
   if (lfe1 >= 0 || lfe2 >= 0) {
     // find a channel place to move
     for (i = 0; i < n_size; i++) {
-      if (lfe1 == i) {
-        n++;
-      }
-      if (lfe2 == i) {
-        n++;
-      }
+      while (n == lfe1 || n == lfe2) n++;
       map[i] = n;
       n++;
     }
