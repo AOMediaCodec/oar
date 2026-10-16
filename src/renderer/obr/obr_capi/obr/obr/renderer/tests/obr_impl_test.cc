@@ -12,7 +12,10 @@
 
 #include "obr/renderer/obr_impl.h"
 
+#include <atomic>
+#include <cmath>
 #include <cstddef>
+#include <thread>
 #include <utility>
 #include <vector>
 
@@ -1072,6 +1075,42 @@ TEST(ObrImplTest, TestPassthroughOnlyAppliesPeakLimiter) {
   // The limiter ceiling is -0.5dB (~0.944). Allow some margin.
   EXPECT_LT(peak_left, 1.1f);
   EXPECT_LT(peak_right, 1.1f);
+}
+
+// Renders while a second thread sweeps the head rotation and toggles head
+// tracking and the limiter. None of those calls takes the mutex `Process()`
+// holds. The test makes no assertion on the output; a ThreadSanitizer build
+// checks the concurrent accesses.
+TEST(ObrImplTest, TestConcurrentHeadRotationDuringProcessing) {
+  const size_t kNumFrames = 256;
+  ObrImpl renderer(kNumFrames, kSamplingRate);
+  EXPECT_THAT(renderer.AddAudioElement(AudioElementType::k3OA), IsOk());
+  EXPECT_THAT(renderer.AddAudioElement(AudioElementType::kLayout7_1_4_ch),
+              IsOk());
+
+  AudioBuffer input_buffer(renderer.GetNumberOfInputChannels(), kNumFrames);
+  for (size_t ch = 0; ch < input_buffer.num_channels(); ++ch) {
+    GenerateWhiteNoise(0.1f, &input_buffer[ch], static_cast<int>(100 + ch));
+  }
+  AudioBuffer output_buffer(2, kNumFrames);
+
+  std::atomic<bool> stop{false};
+  std::thread control([&] {
+    for (int i = 0; !stop.load(std::memory_order_relaxed); ++i) {
+      const float half_angle = 0.005f * static_cast<float>(i % 1257);
+      renderer
+          .SetHeadRotation(std::cos(half_angle), 0.0f, 0.0f,
+                           std::sin(half_angle))
+          .IgnoreError();
+      renderer.EnableHeadTracking(i % 2 == 0);
+      renderer.EnableLimiter(i % 3 != 0);
+    }
+  });
+  for (int block = 0; block < 500; ++block) {
+    renderer.Process(input_buffer, &output_buffer);
+  }
+  stop.store(true, std::memory_order_relaxed);
+  control.join();
 }
 
 }  // namespace
