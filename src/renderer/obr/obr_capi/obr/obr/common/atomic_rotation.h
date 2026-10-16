@@ -35,6 +35,14 @@ class AtomicWorldRotation {
  public:
   /*!\brief The number of times `Load()` reads the components before it
    * returns the fallback.
+   *
+   * `Load()` runs on the render thread, so it must not wait for a writer: a
+   * writer preempted while the sequence is odd would keep an unbounded retry
+   * loop spinning until that writer runs again. An attempt fails only when a
+   * write overlaps it, so with 4 the fallback needs writes to overlap four
+   * consecutive attempts. `ObrImpl` passes the rotation it rendered the
+   * previous block with as the fallback. Any small bound behaves the same
+   * way; 4 is not tuned against a measurement.
    */
   static constexpr int kMaxLoadAttempts = 4;
 
