@@ -29,6 +29,8 @@ namespace obr {
 namespace {
 
 using ::absl_testing::IsOk;
+using ::testing::Eq;
+using ::testing::Pointwise;
 
 constexpr int kBufferSizePerChannel = 44;
 constexpr int kSamplingRate = 48000;
@@ -1099,10 +1101,12 @@ TEST(ObrImplTest, TestProcessPlanarMatchesProcess) {
       buffered.Process(input_buffer, &output_buffer);
       planar.ProcessPlanar(input.data(), output.data(), kNumFrames);
       for (size_t ch = 0; ch < 2; ++ch) {
-        for (size_t frame = 0; frame < kNumFrames; ++frame) {
-          ASSERT_EQ(output[ch * kNumFrames + frame], output_buffer[ch][frame])
-              << "block " << block << ", channel " << ch << ", frame " << frame;
-        }
+        const std::vector<float> expected(output_buffer[ch].begin(),
+                                          output_buffer[ch].end());
+        const std::vector<float> actual(output.begin() + ch * kNumFrames,
+                                        output.begin() + (ch + 1) * kNumFrames);
+        EXPECT_THAT(actual, Pointwise(Eq(), expected))
+            << "block " << block << ", channel " << ch;
       }
     }
   };
