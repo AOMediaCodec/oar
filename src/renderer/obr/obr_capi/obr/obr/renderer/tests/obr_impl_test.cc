@@ -29,6 +29,8 @@ namespace obr {
 namespace {
 
 using ::absl_testing::IsOk;
+using ::testing::Eq;
+using ::testing::Pointwise;
 
 constexpr int kBufferSizePerChannel = 44;
 constexpr int kSamplingRate = 48000;
@@ -1072,6 +1074,58 @@ TEST(ObrImplTest, TestPassthroughOnlyAppliesPeakLimiter) {
   // The limiter ceiling is -0.5dB (~0.944). Allow some margin.
   EXPECT_LT(peak_left, 1.1f);
   EXPECT_LT(peak_right, 1.1f);
+}
+
+// Renders the same input through `Process()` on one renderer and through
+// `ProcessPlanar()` on another with the same elements, and requires identical
+// output: with one element, after a second is added and after it is removed.
+TEST(ObrImplTest, TestProcessPlanarMatchesProcess) {
+  const size_t kNumFrames = 256;
+  ObrImpl buffered(kNumFrames, kSamplingRate);
+  ObrImpl planar(kNumFrames, kSamplingRate);
+
+  auto expect_same_output = [&](int seed) {
+    const size_t num_channels = buffered.GetNumberOfInputChannels();
+    ASSERT_EQ(planar.GetNumberOfInputChannels(), num_channels);
+    AudioBuffer input_buffer(num_channels, kNumFrames);
+    std::vector<float> input(num_channels * kNumFrames);
+    for (size_t ch = 0; ch < num_channels; ++ch) {
+      GenerateWhiteNoise(0.1f, &input_buffer[ch], static_cast<int>(seed + ch));
+      for (size_t frame = 0; frame < kNumFrames; ++frame) {
+        input[ch * kNumFrames + frame] = input_buffer[ch][frame];
+      }
+    }
+    AudioBuffer output_buffer(2, kNumFrames);
+    std::vector<float> output(2 * kNumFrames, 1.0f);
+    for (int block = 0; block < 3; ++block) {
+      buffered.Process(input_buffer, &output_buffer);
+      planar.ProcessPlanar(input.data(), output.data(), kNumFrames);
+      for (size_t ch = 0; ch < 2; ++ch) {
+        const std::vector<float> expected(output_buffer[ch].begin(),
+                                          output_buffer[ch].end());
+        const std::vector<float> actual(output.begin() + ch * kNumFrames,
+                                        output.begin() + (ch + 1) * kNumFrames);
+        EXPECT_THAT(actual, Pointwise(Eq(), expected))
+            << "block " << block << ", channel " << ch;
+      }
+    }
+  };
+
+  for (ObrImpl* renderer : {&buffered, &planar}) {
+    EXPECT_THAT(renderer->AddAudioElement(AudioElementType::k3OA), IsOk());
+  }
+  expect_same_output(10);
+
+  for (ObrImpl* renderer : {&buffered, &planar}) {
+    EXPECT_THAT(renderer->AddAudioElement(AudioElementType::kLayout7_1_4_ch),
+                IsOk());
+  }
+  expect_same_output(20);
+
+  for (ObrImpl* renderer : {&buffered, &planar}) {
+    EXPECT_THAT(renderer->RemoveLastAudioElement(), IsOk());
+  }
+  expect_same_output(30);
 }
 
 }  // namespace

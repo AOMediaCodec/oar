@@ -31,6 +31,16 @@ AssociatedLegendrePolynomialsGenerator::AssociatedLegendrePolynomialsGenerator(
 std::vector<float> AssociatedLegendrePolynomialsGenerator::Generate(
     float x) const {
   std::vector<float> values(GetNumValues());
+  Generate(x, &values);
+  return values;
+}
+
+void AssociatedLegendrePolynomialsGenerator::Generate(
+    float x, std::vector<float>* values_out) const {
+  ABSL_DCHECK_NE(values_out, nullptr);
+  // Assigning a size within the capacity does not allocate.
+  values_out->assign(GetNumValues(), 0.0f);
+  std::vector<float>& values = *values_out;
 
   // Bases for the recurrence relations.
   values[GetIndex(0, 0)] = ComputeValue(0, 0, x, values);
@@ -78,7 +88,6 @@ std::vector<float> AssociatedLegendrePolynomialsGenerator::Generate(
       }
     }
   }
-  return values;
 }
 
 size_t AssociatedLegendrePolynomialsGenerator::GetNumValues() const {
