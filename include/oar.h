@@ -213,6 +213,13 @@ int oar_remove_audio_element(oar_t *oar, uint32_t id);
  *            ck_metadata_iamf_downmix_mode) are hints that take effect only
  *            when the current rendering path has a consumer for them.
  *            Returning ck_oar_ok means "accepted", not "took effect".
+ * @note      Gain and object position metadata are queued per element, and
+ *            each applies for its duration in samples, in the order pushed.
+ *            Once rendering has used up the queued metadata of a type,
+ *            metadata of that type pushed afterwards applies from the next
+ *            rendered sample. Duration-only metadata cannot describe a gap:
+ *            to hold a gain or a position over a span, push metadata that
+ *            covers it.
  */
 int oar_update_audio_element_metadata(oar_t *oar, uint32_t id,
                                       const oar_metadata_t *metadata);
