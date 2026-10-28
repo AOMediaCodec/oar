@@ -20,6 +20,32 @@ jobs:
       - uses: ilammy/msvc-dev-cmd@v1
         if: runner.os == 'Windows'
 
+      # Configure clones the FetchContent dependencies (googletest and abseil
+      # from GitHub, Eigen from gitlab.com, pffft from bitbucket.org). Their
+      # sources, without .git, are cached per OS under a key that changes with
+      # the file that pins them; on a hit, Configure takes them from deps/ and
+      # downloads nothing.
+      - name: Restore dependency sources
+        id: deps
+        uses: actions/cache/restore@v4
+        with:
+          path: deps
+          key: fetchcontent-src-v1-${{ runner.os }}-${{ hashFiles('src/renderer/obr/obr_capi/obr/CMakeLists.txt') }}
+
+      - name: Use cached dependency sources
+        if: steps.deps.outputs.cache-hit == 'true'
+        shell: bash
+        run: |
+          deps='${{ github.workspace }}/deps'
+          deps="${deps//\\//}"
+          {
+            printf 'FETCHCONTENT_SOURCE_DIRS='
+            printf -- '-DFETCHCONTENT_SOURCE_DIR_%s=%s ' \
+              ABSL "$deps/absl" EIGEN "$deps/eigen" \
+              GOOGLETEST "$deps/googletest" PFFFT "$deps/pffft"
+            echo
+          } >> "$GITHUB_ENV"
+
       # CMAKE_Fortran_COMPILER=NOTFOUND stops Eigen's blas/ subdirectory from
       # probing for a Fortran compiler (its check_language call skips the probe
       # when the cache variable is already defined), which otherwise fails on
@@ -32,6 +58,28 @@ jobs:
           -DOAR_BUILD_EXAMPLES=ON
           -DOAR_BUILD_SHARED_LIBRARY=${{ matrix.library == 'shared' && 'ON' || 'OFF' }}
           -DCMAKE_Fortran_COMPILER=NOTFOUND
+          ${{ env.FETCHCONTENT_SOURCE_DIRS }}
+
+      # Saved before Build, so a later failure still leaves the cache. The
+      # shared and static jobs of an OS share the key; when both miss, the
+      # first save is kept and the second is reported in the log without
+      # failing the job.
+      - name: Copy dependency sources for the cache
+        if: steps.deps.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          for name in absl eigen googletest pffft; do
+            mkdir -p "deps/$name"
+            tar -C "build/_deps/$name-src" --exclude=.git -cf - . |
+              tar -C "deps/$name" -xf -
+          done
+
+      - name: Save dependency sources
+        if: steps.deps.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: deps
+          key: ${{ steps.deps.outputs.cache-primary-key }}
 
       - name: Build
         run: cmake --build build --parallel
