@@ -50,7 +50,7 @@ static speaker_position_t g_sp_up135 = {"U+135", 135.0, 30.0, 0};
 static speaker_position_t g_sp_up180 = {"U+180", 180.0, 30.0, 0};
 
 // Centre Height for Sound System F in BS.2094
-static speaker_position_t g_sp_uhp180 = {"U+180", 180.0, 45.0, 0};
+static speaker_position_t g_sp_uhp180 = {"UH+180", 180.0, 45.0, 0};
 
 static speaker_position_t g_sp_bp000 = {"B+000", 0.0, -30.0, 0};
 static speaker_position_t g_sp_bm045 = {"B-045", -45.0, -30.0, 0};
