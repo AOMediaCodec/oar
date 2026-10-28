@@ -89,7 +89,7 @@ project must also import (or copy) the toolchain flags obr needs — C++20,
 
 ### Basic Workflow
 
-1.  **Initialization**: Create an `oar_t` instance by specifying the target output layout, samples per channel, and sampling rate.
+1.  **Initialization**: Create an `oar_t` instance by specifying the target output layout, samples per channel, and sampling rate. Samples per channel can be 1 to 16,777,216; [Frame Size](doc/samples_per_channel.md) gives the CPU and memory cost of small and large values and a recommended range.
 2.  **Audio Group Management**: Add audio groups using `oar_add_audio_group`. Audio elements must be added to a group, and the library supports up to 2 groups.
 3.  **Audio Element Configuration**: Add one or more audio elements to specific groups using `oar_add_audio_element`. Each element can be channel-based, scene-based, or object-based.
     *   **Important**: Object-based audio elements cannot be mixed with other types (channel-based or scene-based) in the same `oar_t` instance.

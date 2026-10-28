@@ -51,8 +51,9 @@ class Resampler {
   size_t GetNextOutputLength(size_t input_length) const;
 
   /*!\brief Sets the source and destination sampling rate as well as the number
-   * of channels. Note this method only resets the filter state number of
-   * channel changes.
+   * of channels, and sizes the polyphase filter and the filter state for
+   * them. The filter state keeps its existing samples; `ResetState()` clears
+   * it.
    *
    * \param source_frequency Sampling rate of input data.
    * \param destination_frequency Desired output sampling rate.
@@ -62,7 +63,12 @@ class Resampler {
                              size_t num_channels);
 
   /*!\brief Returns whether the sampling rates provided are supported by the
-   * resampler.
+   * resampler. `Process()` indexes the filter state, which holds one sample
+   * fewer than each phase of the polyphase filter, with `int`, so a phase
+   * must not have more than 2^31 - 1 coefficients; only downsampling by a
+   * factor of more than about 165 million exceeds that. The polyphase filter's
+   * size in bytes must also fit in a size_t, which limits only 32-bit
+   * platforms.
    *
    * \param source Source sampling rate.
    * \param destination Destination sampling rate.
@@ -76,9 +82,10 @@ class Resampler {
 
  private:
   friend class PolyphaseFilterTest;
-  /*!\brief Initializes the `state_` buffer.
+  /*!\brief Sizes the `state_` buffer for `num_channels_` channels and the
+   * current polyphase filter.
    *
-   * Called when sampling rate is changed or the state is reset.
+   * Called when the sampling rates or the number of channels are set.
    *
    * \param old_state_num_frames Number of frames in the `state_` buffer
    *        previous to the most recent call to `GenerateInterpolatingFilter`.
@@ -133,10 +140,6 @@ class Resampler {
 
   // Filter coefficients stored in polyphase form.
   AudioBuffer transposed_filter_coeffs_;
-
-  // Filter coefficients in planar form, used for calculating the transposed
-  // filter.
-  AudioBuffer temporary_filter_coeffs_;
 
   // Buffer holding the samples of input required between input buffers.
   AudioBuffer state_;

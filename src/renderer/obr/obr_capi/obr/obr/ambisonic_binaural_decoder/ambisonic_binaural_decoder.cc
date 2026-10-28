@@ -19,7 +19,6 @@
 #include "obr/ambisonic_binaural_decoder/partitioned_fft_filter.h"
 #include "obr/audio_buffer/audio_buffer.h"
 #include "obr/common/constants.h"
-#include "obr/common/misc_math.h"
 
 namespace obr {
 
@@ -27,11 +26,10 @@ AmbisonicBinauralDecoder::AmbisonicBinauralDecoder(
     const AudioBuffer& sh_hrirs_L, const AudioBuffer& sh_hrirs_R,
     size_t frames_per_buffer, FftManager* fft_manager)
     : fft_manager_(fft_manager),
-      freq_input_(kNumMonoChannels,
-                  NextPowTwo(frames_per_buffer) * kNumStereoChannels),
       filtered_input_(kNumMonoChannels, frames_per_buffer) {
   ABSL_CHECK_NE(fft_manager_, nullptr);
   ABSL_CHECK_NE(frames_per_buffer, 0U);
+  freq_input_ = AudioBuffer(kNumMonoChannels, fft_manager_->GetFftSize());
   const size_t num_channels = sh_hrirs_L.num_channels();
   const size_t filter_size = sh_hrirs_L.num_frames();
   ABSL_CHECK_NE(num_channels, 0U);

@@ -29,8 +29,8 @@
  *   TC2: When group 1 is added after two blocks of group 0, the third block
  *        equals the sum of group 0's third block and group 1's first block,
  *        each rendered alone in its own oar_t.
- *   TC3: oar_render() on an oar_t configured with zero samples per channel,
- *        holding an element that has data, returns ck_oar_error_inval.
+ *   TC3: oar_create() returns NULL for a configuration with zero samples per
+ *        channel.
  */
 
 #include <stdint.h>
@@ -60,8 +60,8 @@ static void fill_input(float *data, uint32_t count, uint32_t id, int block,
 }
 
 static oar_t *create_stereo_oar(void) {
-  oar_config_t cfg = create_config(ck_oar_layout_stereo, BLOCK,
-                                   TEST_SAMPLING_RATE);
+  oar_config_t cfg =
+      create_config(ck_oar_layout_stereo, BLOCK, TEST_SAMPLING_RATE);
   oar_t *oar = oar_create(&cfg);
   if (oar && oar_enable_limiter(oar, 0) != ck_oar_ok) {
     oar_destroy(oar);
@@ -177,41 +177,21 @@ static int test_group_added_between_renders(void) {
               "object group renders silence");
   for (int i = 0; i < 2 * BLOCK; i++) {
     if (out[i] != ref_channel[i] + ref_object[i]) {
-      fprintf(stderr, "sample %d: got %.9g, expected %.9g + %.9g\n", i,
-              out[i], ref_channel[i], ref_object[i]);
+      fprintf(stderr, "sample %d: got %.9g, expected %.9g + %.9g\n", i, out[i],
+              ref_channel[i], ref_object[i]);
       TEST_ASSERT(0, "mixed output differs from the sum of the groups");
     }
   }
   return TEST_PASS;
 }
 
-/* TC3: a zero-length configuration returns ck_oar_error_inval. Adding the
- * element allocates its input block with calloc(0), which returns non-NULL on
- * macOS, glibc and the MSVC CRT; C17 also allows NULL, where the add fails. */
+/* TC3: a zero-length configuration is rejected when the oar_t is created. */
 static int test_zero_length_config(void) {
   TEST_START("TC3: zero samples per channel");
 
-  float in[2], out[2];
   oar_config_t cfg = create_config(ck_oar_layout_stereo, 0, TEST_SAMPLING_RATE);
-  oar_t *oar = oar_create(&cfg);
-  TEST_ASSERT(oar != NULL, "oar_create failed");
-  const int gid = oar_add_audio_group(oar);
-  TEST_ASSERT(gid >= 0, "oar_add_audio_group failed");
-  oar_audio_element_config_t element =
-      create_channel_element_config(ck_oar_layout_stereo);
-  TEST_ASSERT(oar_add_audio_element(oar, (uint32_t)gid, CHANNEL_ELEMENT_ID,
-                                    &element) == ck_oar_ok,
-              "oar_add_audio_element failed");
-  oar_audio_block_t input = {in, 2, 0};
-  TEST_ASSERT(oar_update_audio_element_data(oar, CHANNEL_ELEMENT_ID, &input) ==
-                  ck_oar_ok,
-              "oar_update_audio_element_data failed");
-
-  oar_audio_block_t output = {out, 2, 0};
-  const int ret = oar_render(oar, &output);
-  oar_destroy(oar);
-  TEST_ASSERT(ret == ck_oar_error_inval,
-              "zero-length render did not return ck_oar_error_inval");
+  TEST_ASSERT(oar_create(&cfg) == NULL,
+              "oar_create accepted zero samples per channel");
   return TEST_PASS;
 }
 

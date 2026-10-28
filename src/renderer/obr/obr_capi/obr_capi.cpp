@@ -21,9 +21,32 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 
 #include "obr/renderer/obr_impl.h"
 using namespace obr;
+
+namespace {
+
+// Calls `f` and returns false if it throws, so that an allocation failure in
+// ObrImpl, which sizes its buffers from the buffer size and the sampling rate,
+// becomes an error return instead of crossing the C API. In builds without
+// exceptions an allocation failure aborts.
+template <typename F>
+bool CallWithoutThrowing(F &&f) {
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+  try {
+    f();
+  } catch (const std::exception &) {
+    return false;
+  }
+#else
+  f();
+#endif
+  return true;
+}
+
+}  // namespace
 
 struct CObrApiPriv {
   std::unique_ptr<ObrImpl> obr;
@@ -45,13 +68,19 @@ void ObrApiPrivDestroy(CObrApiPriv *&instance) {
 }
 
 obr_handle obr_create(int buffer_size_per_channel, int sampling_rate) {
-  if (!buffer_size_per_channel || !sampling_rate) return NULL;
+  // ObrImpl aborts on values outside these ranges.
+  if (buffer_size_per_channel <= 0 ||
+      buffer_size_per_channel > ObrImpl::kMaxBufferSizePerChannel ||
+      sampling_rate <= 0)
+    return NULL;
 
   obr_handle handle = static_cast<obr_handle>(ObrApiPrivCreate());
   auto priv = static_cast<CObrApiPriv *>(handle);
 
-  priv->obr = std::make_unique<ObrImpl>(buffer_size_per_channel, sampling_rate);
-  if (!priv->obr) {
+  if (!CallWithoutThrowing([&] {
+        priv->obr =
+            std::make_unique<ObrImpl>(buffer_size_per_channel, sampling_rate);
+      })) {
     ObrApiPrivDestroy(priv);
     return NULL;
   }
@@ -70,10 +99,24 @@ int obr_add_audio_element(obr_handle handle, ObrAudioElementType type,
   if (input_type == AudioElementType::kInvalidType)
     return -3;  // Error: invalid audio element type
 
-  auto status = cast_(handle)->AddAudioElement(
-      input_type, static_cast<BinauralFilterProfile>(filter_profile));
-  if (!status.ok())
-    return -4;  // Error: failed to add audio element from ObrImpl
+  ObrImpl *obr = cast_(handle);
+  const size_t num_elements = obr->GetNumberOfAudioElements();
+  bool added = false;
+  if (!CallWithoutThrowing([&] {
+        added = obr->AddAudioElement(
+                       input_type,
+                       static_cast<BinauralFilterProfile>(filter_profile))
+                    .ok();
+      })) {
+    // An allocation failed. Remove the element if it was added, which
+    // rebuilds the processing groups of the remaining elements.
+    CallWithoutThrowing([&] {
+      if (obr->GetNumberOfAudioElements() > num_elements)
+        obr->RemoveLastAudioElement().IgnoreError();
+    });
+    return -5;  // Error: out of memory
+  }
+  if (!added) return -4;  // Error: failed to add audio element from ObrImpl
 
   return 0;  // Success
 }
@@ -115,8 +158,11 @@ int obr_get_number_of_audio_elements(obr_handle handle) {
 
 int obr_remove_last_audio_element(obr_handle handle) {
   if (!handle) return -1;
-  auto status = cast_(handle)->RemoveLastAudioElement();
-  return status.ok() ? 0 : -1;
+  bool removed = false;
+  if (!CallWithoutThrowing(
+          [&] { removed = cast_(handle)->RemoveLastAudioElement().ok(); }))
+    return -1;
+  return removed ? 0 : -1;
 }
 
 int obr_update_object_position(obr_handle handle, uint32_t index, float azimuth,
