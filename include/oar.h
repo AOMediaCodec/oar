@@ -111,6 +111,10 @@ typedef enum EAudioElementType {
   ck_object_based,
 } audio_element_type_t;
 
+/** Largest oar_config_t.samples_per_channel that oar_create() accepts,
+ * 2^24. */
+#define def_oar_max_samples_per_channel 16777216
+
 typedef struct OarConfig {
   oar_layout_t target_layout;
   uint32_t samples_per_channel;
@@ -143,7 +147,19 @@ typedef struct OarAudioElementConfig {
 /**
  * @brief     Create an OAR object
  * @param     [in] config : Configuration parameters
- * @return    Pointer to oar_t on success, NULL on failure
+ * @return    Pointer to oar_t on success, NULL on failure, including a
+ *            config->samples_per_channel of 0 or above
+ *            def_oar_max_samples_per_channel (16777216)
+ * @note      The upper limit keeps the renderers' 32-bit channels x samples
+ *            buffer sizes and offsets from wrapping. With target_layout
+ *            ck_oar_layout_binaural, small sizes cost more CPU per sample
+ *            and large sizes more memory. For one third-order element with
+ *            the ambient profile the binaural renderer measured, on an Apple
+ *            M5 Pro, 0.45% of one core at 4096 samples, 1.2% at 256, 10% at
+ *            32 and 98% at 8, and its memory grows by about 1.8 MiB per 1000
+ *            samples above 8192.
+ *            doc/samples_per_channel.md has the measurements and recommends
+ *            256 to 65536.
  */
 oar_t *oar_create(const oar_config_t *config);
 
@@ -298,7 +314,7 @@ int oar_update_metadata(oar_t *oar, uint32_t gid,
  * @return    ck_oar_ok (0) on success, ck_oar_error_inval (-22) for invalid
  *            parameters (including channel mismatch, insufficient samples,
  *            no audio groups, no data, or a configuration with zero output
- *            channels or zero samples per channel). oar_render() does not
+ *            channels). oar_render() does not
  *            return ck_oar_error_nomem: an element whose renderer fails,
  *            for example on an allocation failure, is left out of the mix
  *            and the call returns ck_oar_ok.

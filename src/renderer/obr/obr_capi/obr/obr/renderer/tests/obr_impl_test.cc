@@ -12,6 +12,7 @@
 
 #include "obr/renderer/obr_impl.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstddef>
@@ -1220,6 +1221,91 @@ TEST(ObrImplTest, TestConcurrentHeadRotationDuringProcessing) {
   }
   stop.store(true, std::memory_order_relaxed);
   control.join();
+}
+
+// Renders the same input with buffer sizes from 1 to 65536 frames, below, at
+// and above the 32-point minimum FFT size, and compares each output with the
+// output of one 1024-frame buffer. Buffers longer than the input are rendered
+// once, with the input zero-padded. The partitioned convolution's output does
+// not depend on the buffer size apart from float rounding. Head tracking is
+// off and the limiter is disabled, so no other stage depends on it.
+TEST(ObrImplTest, TestOutputDoesNotDependOnBufferSize) {
+  const size_t kNumFrames = 1024;
+  const size_t kBufferSizes[] = {1,  7,  8,  15,   16,    17,
+                                 31, 32, 44, 1000, 16385, 65536};
+  const float kTolerance = 1e-5f;
+
+  const auto render = [&](size_t buffer_size) {
+    ObrImpl renderer(static_cast<int>(buffer_size), kSamplingRate);
+    renderer.EnableLimiter(false);
+    EXPECT_THAT(renderer.AddAudioElement(AudioElementType::k3OA), IsOk());
+    EXPECT_THAT(renderer.AddAudioElement(AudioElementType::kObjectMono),
+                IsOk());
+    EXPECT_THAT(renderer.UpdateObjectPosition(1, 30.0f, 10.0f, 1.0f), IsOk());
+
+    const size_t num_channels = renderer.GetNumberOfInputChannels();
+    AudioBuffer signal(num_channels, kNumFrames);
+    for (size_t ch = 0; ch < num_channels; ++ch) {
+      GenerateWhiteNoise(0.1f, &signal[ch], static_cast<unsigned int>(ch + 1));
+    }
+
+    AudioBuffer input_buffer(num_channels, buffer_size);
+    AudioBuffer output_buffer(kNumBinauralChannels, buffer_size);
+    std::vector<std::vector<float>> output(kNumBinauralChannels);
+    for (size_t start = 0; start < kNumFrames; start += buffer_size) {
+      const size_t count = std::min(buffer_size, kNumFrames - start);
+      input_buffer.Clear();
+      for (size_t ch = 0; ch < num_channels; ++ch) {
+        std::copy_n(signal[ch].begin() + start, count,
+                    input_buffer[ch].begin());
+      }
+      renderer.Process(input_buffer, &output_buffer);
+      for (size_t ch = 0; ch < kNumBinauralChannels; ++ch) {
+        output[ch].insert(output[ch].end(), output_buffer[ch].begin(),
+                          output_buffer[ch].begin() + count);
+      }
+    }
+    return output;
+  };
+
+  const std::vector<std::vector<float>> expected = render(kNumFrames);
+  EXPECT_TRUE(std::any_of(expected[0].begin(), expected[0].end(),
+                          [](float sample) { return sample != 0.0f; }));
+  for (const size_t buffer_size : kBufferSizes) {
+    const std::vector<std::vector<float>> actual = render(buffer_size);
+    for (size_t ch = 0; ch < kNumBinauralChannels; ++ch) {
+      float max_difference = 0.0f;
+      for (size_t frame = 0; frame < kNumFrames; ++frame) {
+        max_difference = std::max(
+            max_difference, std::abs(actual[ch][frame] - expected[ch][frame]));
+      }
+      EXPECT_LE(max_difference, kTolerance)
+          << "buffer size " << buffer_size << ", channel " << ch;
+    }
+  }
+}
+
+// Renders a 3OA element at sampling rates whose polyphase filter for
+// resampling the 48 kHz HRIRs has more than 16384 coefficients: 44056 Hz
+// (5507/6000 of 48 kHz, 82605 coefficients) and 50360 Hz (1259/1200, 17626).
+TEST(ObrImplTest, TestRendersAtSamplingRatesWithLongResamplingFilters) {
+  const size_t kNumFrames = 256;
+  for (const int sampling_rate : {44056, 50360}) {
+    ObrImpl renderer(kNumFrames, sampling_rate);
+    renderer.EnableLimiter(false);
+    EXPECT_THAT(renderer.AddAudioElement(AudioElementType::k3OA), IsOk());
+
+    AudioBuffer input_buffer(renderer.GetNumberOfInputChannels(), kNumFrames);
+    for (size_t ch = 0; ch < input_buffer.num_channels(); ++ch) {
+      GenerateWhiteNoise(0.1f, &input_buffer[ch],
+                         static_cast<unsigned int>(ch + 1));
+    }
+    AudioBuffer output_buffer(kNumBinauralChannels, kNumFrames);
+    renderer.Process(input_buffer, &output_buffer);
+    EXPECT_TRUE(std::any_of(output_buffer[0].begin(), output_buffer[0].end(),
+                            [](float sample) { return sample != 0.0f; }))
+        << "sampling rate " << sampling_rate;
+  }
 }
 
 }  // namespace
