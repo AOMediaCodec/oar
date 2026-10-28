@@ -90,9 +90,11 @@ typedef enum ObrBinauralFilterProfile {
 
 /**
  * @brief     Create open binaural renderer handle
- * @param     [in] buffer_size_per_channel :  Buffer size per channel in samples
+ * @param     [in] buffer_size_per_channel :  Buffer size per channel in
+ *                                            samples, from 1 to 2^29
  * @param     [in] sampling_rate : Sampling rate in Hz.
- * @return    return open binaural renderer handle, or NULL on failure.
+ * @return    return open binaural renderer handle, or NULL on failure or when
+ *            buffer_size_per_channel or sampling_rate is out of range.
  */
 obr_handle obr_create(int buffer_size_per_channel, int sampling_rate);
 
@@ -106,7 +108,8 @@ obr_handle obr_create(int buffer_size_per_channel, int sampling_rate);
  *            - kObrAmbient: Ambient rendering with enhanced spatial diffusion
  *            - kObrReverberant: Reverberant rendering with added room
  * simulation
- * @return    0 on success, negative value on error.
+ * @return    0 on success, negative value on error: -5 when an allocation
+ *            failed, in which case the instance keeps its previous elements.
  */
 int obr_add_audio_element(obr_handle handle, ObrAudioElementType type,
                           ObrBinauralFilterProfile profile);

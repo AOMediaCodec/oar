@@ -155,6 +155,12 @@ oar_t *oar_create(const oar_config_t *config) {
   renderer_library_manager_t *manager = 0;
 
   if (!config) return 0;
+  if (!config->samples_per_channel ||
+      config->samples_per_channel > def_oar_max_samples_per_channel) {
+    error("samples_per_channel %u is outside 1 to %d.",
+          config->samples_per_channel, def_oar_max_samples_per_channel);
+    return 0;
+  }
 
   oar = def_mallocz(oar_t, 1);
   if (!oar) return 0;
@@ -299,6 +305,9 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
   audio_group_t *group = 0;
   value_wrap_t v;
   rid_t rid = ck_rid_none;
+  /* Returned when no renderer takes the element: an allocation failure in the
+   * binaural renderer, otherwise invalid parameters. */
+  int add_ret = ck_oar_error_inval;
 
   if (!oar || !config) return ck_oar_error_inval;
 
@@ -342,6 +351,7 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
         } else {
           warn("Failed to add element %u to binaural renderer. Error: %d", id,
                ret);
+          if (ret == ck_oar_error_nomem) add_ret = ck_oar_error_nomem;
         }
       }
     }
@@ -351,7 +361,7 @@ int oar_add_audio_element(oar_t *oar, uint32_t gid, uint32_t id,
         config);
   }
 
-  if (!renderer) return ck_oar_error_inval;
+  if (!renderer) return add_ret;
 
   if (rid == ck_rio_id_binaural) {
     int lock =
@@ -539,9 +549,9 @@ int oar_render(oar_t *oar, oar_audio_block_t *output) {
   out_channels = oar_get_number_of_output_channels(oar);
   samples = oar->config.samples_per_channel;
 
-  /* A configuration with no output channels or no samples per channel has
-   * no scratch storage and nothing to render. */
-  if (!out_channels || !samples) return ck_oar_error_inval;
+  /* A configuration with no output channels has no scratch storage and
+   * nothing to render. oar_create() rejects zero samples per channel. */
+  if (!out_channels) return ck_oar_error_inval;
 
   if (output->channels != out_channels || output->samples_per_channel < samples)
     return ck_oar_error_inval;

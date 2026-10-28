@@ -19,7 +19,9 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <cstdlib>
+#include <limits>
 #include <numeric>
 
 #include "absl/log/absl_check.h"
@@ -39,10 +41,10 @@ namespace {
 // and filter rolloff wrt. cutoff frequency.
 const size_t kTransitionBandwidthRatio = 13;
 
-// Maximum number of channels internally based upon the maximum supported
-// ambisonic order.
-const size_t kMaxNumChannels =
-    (kMaxSupportedAmbisonicOrder + 1) * (kMaxSupportedAmbisonicOrder + 1);
+// `Process()` indexes the `state_` buffer, which holds `coeffs_per_phase_` - 1
+// frames, with `int`.
+const size_t kMaxCoeffsPerPhase =
+    static_cast<size_t>(std::numeric_limits<int>::max());
 
 }  // namespace
 
@@ -52,12 +54,7 @@ Resampler::Resampler()
       time_modulo_up_rate_(0),
       last_processed_sample_(0),
       num_channels_(0),
-      coeffs_per_phase_(0),
-      transposed_filter_coeffs_(kNumMonoChannels, kMaxSupportedNumFrames),
-      temporary_filter_coeffs_(kNumMonoChannels, kMaxSupportedNumFrames),
-      state_(kMaxNumChannels, kMaxSupportedNumFrames) {
-  state_.Clear();
-}
+      coeffs_per_phase_(0) {}
 
 void Resampler::Process(const AudioBuffer& input, AudioBuffer* output) {
   // See "Digital Signal Processing, 4th Edition, Prolakis and Manolakis,
@@ -163,7 +160,10 @@ size_t Resampler::GetMaxOutputLength(size_t input_length) const {
   // (time_modulo_up_rate_ + up_rate_ * last_processed_sample_) <
   // ((input_length * up_rate_) % down_rate_)
   // The output length will be equal to the return value or the return value -1.
-  return (input_length * up_rate_) / down_rate_ + 1;
+  // The product is taken in 64 bits, as it can exceed a 32-bit size_t.
+  return static_cast<size_t>(static_cast<uint64_t>(input_length) * up_rate_ /
+                             down_rate_) +
+         1;
 }
 
 size_t Resampler::GetNextOutputLength(size_t input_length) const {
@@ -171,8 +171,9 @@ size_t Resampler::GetNextOutputLength(size_t input_length) const {
     return input_length;
   }
   const size_t max_length = GetMaxOutputLength(input_length);
-  if ((time_modulo_up_rate_ + up_rate_ * last_processed_sample_) >=
-      ((input_length * up_rate_) % down_rate_)) {
+  if ((time_modulo_up_rate_ +
+       static_cast<uint64_t>(up_rate_) * last_processed_sample_) >=
+      ((static_cast<uint64_t>(input_length) * up_rate_) % down_rate_)) {
     return max_length - 1;
   }
   return max_length;
@@ -210,23 +211,28 @@ void Resampler::SetRateAndNumChannels(int source_frequency,
   }
 
   // Update the `state_` buffer.
-  if (num_channels_ != num_channels) {
-    num_channels_ = num_channels;
-    InitializeStateBuffer(old_state_size);
-  }
+  num_channels_ = num_channels;
+  InitializeStateBuffer(old_state_size);
 }
 
 bool Resampler::AreSampleRatesSupported(int source, int destination) {
   ABSL_DCHECK_GT(source, 0);
   ABSL_DCHECK_GT(destination, 0);
-  // Determines whether sample rates are supported based upon whether our
-  // maximal filter length is big enough to hold the corresponding
-  // interpolation filter.
-  const int max_rate =
-      std::max(source, destination) / FindGcd(source, destination);
-  size_t filter_length = max_rate * kTransitionBandwidthRatio;
+  // Determines whether sample rates are supported based upon whether the
+  // polyphase filter generated for them, as in `GenerateInterpolatingFilter()`,
+  // has at most `kMaxCoeffsPerPhase` coefficients per phase and fits in a
+  // buffer whose size in bytes is a size_t. The sizes are computed in 64 bits.
+  const int greatest_common_divisor = FindGcd(source, destination);
+  const uint64_t up_rate =
+      static_cast<uint64_t>(destination / greatest_common_divisor);
+  const uint64_t max_rate = static_cast<uint64_t>(
+      std::max(source, destination) / greatest_common_divisor);
+  uint64_t filter_length = max_rate * kTransitionBandwidthRatio;
   filter_length += filter_length % 2;
-  return filter_length <= kMaxSupportedNumFrames;
+  const uint64_t coeffs_per_phase = filter_length / up_rate + 1;
+  return coeffs_per_phase <= kMaxCoeffsPerPhase &&
+         up_rate * coeffs_per_phase <=
+             std::numeric_limits<size_t>::max() / sizeof(float);
 }
 
 void Resampler::ResetState() {
@@ -236,28 +242,31 @@ void Resampler::ResetState() {
 }
 
 void Resampler::InitializeStateBuffer(size_t old_state_num_frames) {
-  // Update the `state_` buffer if it is null or if the number of coefficients
-  // per phase in the polyphase filter has changed.
+  // Resize the `state_` buffer to `num_channels_` channels of
+  // `coeffs_per_phase_` - 1 frames.
   if (up_rate_ == down_rate_ || num_channels_ == 0) {
     return;
   }
-  // If the `state_` buffer is to be kept. For example in the case of a change
-  // in either source or destination sampling rate, maintaining the old `state_`
-  // buffers contents allows a glitch free transition.
   const size_t new_state_num_frames =
       coeffs_per_phase_ > 0 ? coeffs_per_phase_ - 1 : 0;
-  if (old_state_num_frames != new_state_num_frames) {
-    const size_t min_size =
-        std::min(new_state_num_frames, old_state_num_frames);
-    const size_t max_size =
-        std::max(new_state_num_frames, old_state_num_frames);
-    for (size_t channel = 0; channel < num_channels_; ++channel) {
-      auto& state_channel = state_[channel];
-      ABSL_DCHECK_LT(state_channel.begin() + max_size, state_channel.end());
-      std::fill(state_channel.begin() + min_size,
-                state_channel.begin() + max_size, 0.0f);
-    }
+  if (state_.num_channels() == num_channels_ &&
+      state_.num_frames() == new_state_num_frames) {
+    return;
   }
+  // Keep the first `old_state_num_frames` frames of the existing channels and
+  // zero the rest. A caller that starts a new stream calls `ResetState()`
+  // first.
+  AudioBuffer new_state(num_channels_, new_state_num_frames);
+  new_state.Clear();
+  const size_t num_frames_kept = std::min(
+      {old_state_num_frames, new_state_num_frames, state_.num_frames()});
+  const size_t num_channels_kept =
+      std::min(num_channels_, state_.num_channels());
+  for (size_t channel = 0; channel < num_channels_kept; ++channel) {
+    std::copy_n(state_[channel].begin(), num_frames_kept,
+                new_state[channel].begin());
+  }
+  state_ = new_state;
 }
 
 void Resampler::GenerateInterpolatingFilter(int sample_rate) {
@@ -268,7 +277,8 @@ void Resampler::GenerateInterpolatingFilter(int sample_rate) {
       static_cast<float>(sample_rate) / static_cast<float>(2 * max_rate);
   size_t filter_length = max_rate * kTransitionBandwidthRatio;
   filter_length += filter_length % 2;
-  auto* filter_channel = &temporary_filter_coeffs_[0];
+  AudioBuffer filter(kNumMonoChannels, filter_length);
+  auto* filter_channel = &filter[0];
   filter_channel->Clear();
   GenerateSincFilter(cutoff_frequency, static_cast<float>(sample_rate),
                      filter_length, filter_channel);
@@ -294,6 +304,8 @@ void Resampler::ArrangeFilterAsPolyphase(size_t filter_length,
   // h[9], h[6], h[3], h[0],   flipped phase 0 coefs.
   //  0,   h[7], h[4], h[1],   flipped phase 1 coefs (zero-padded).
   //  0,   h[8], h[5], h[2],   flipped phase 2 coefs (zero-padded).
+  transposed_filter_coeffs_ =
+      AudioBuffer(kNumMonoChannels, up_rate_ * coeffs_per_phase_);
   transposed_filter_coeffs_.Clear();
   auto& transposed_coefficients_channel = transposed_filter_coeffs_[0];
   for (size_t i = 0; i < up_rate_; ++i) {

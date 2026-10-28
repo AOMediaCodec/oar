@@ -37,8 +37,23 @@
 
 namespace obr {
 
+namespace {
+
+// Checks the buffer size before the members sized from it are constructed.
+int CheckBufferSizePerChannel(int buffer_size_per_channel) {
+  ABSL_CHECK_GT(buffer_size_per_channel, 0)
+      << "Buffer size per channel must be greater than 0.";
+  ABSL_CHECK_LE(buffer_size_per_channel, ObrImpl::kMaxBufferSizePerChannel)
+      << "Only frame lengths up to " << ObrImpl::kMaxBufferSizePerChannel
+      << " are supported.";
+  return buffer_size_per_channel;
+}
+
+}  // namespace
+
 ObrImpl::ObrImpl(int buffer_size_per_channel, int sampling_rate)
-    : buffer_size_per_channel_(buffer_size_per_channel),
+    : buffer_size_per_channel_(
+          CheckBufferSizePerChannel(buffer_size_per_channel)),
       sampling_rate_(sampling_rate),
       head_tracking_enabled_(false),
       limiter_enabled_(true),
@@ -46,17 +61,7 @@ ObrImpl::ObrImpl(int buffer_size_per_channel, int sampling_rate)
       group_output_(kNumBinauralChannels, buffer_size_per_channel_),
       planar_input_(0, buffer_size_per_channel_),
       planar_output_(kNumBinauralChannels, buffer_size_per_channel_) {
-  ABSL_CHECK_GT(buffer_size_per_channel, 0)
-      << "Buffer size per channel must be greater than 0.";
   ABSL_CHECK_GT(sampling_rate_, 0) << "Sampling rate must be greater than 0.";
-
-  ABSL_CHECK_GE(buffer_size_per_channel, FftManager::kMinFftSize)
-      << "Buffer size per channel must be at least " << FftManager::kMinFftSize
-      << " samples.";
-
-  ABSL_CHECK_LE(buffer_size_per_channel, kMaxSupportedNumFrames)
-      << "Only frame lengths up to " << kMaxSupportedNumFrames
-      << " are supported.";
 }
 
 ObrImpl::~ObrImpl() = default;
