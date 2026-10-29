@@ -122,11 +122,14 @@ TEST(ResamplerTest, DownSampleTest) {
 // the tail of the interpolation filter, causing rate-pair-dependent gain
 // errors (-2.5 dB at 96k->48k, -35 dB at 192k->48k, -41 dB at 176.4k->48k)
 // and degraded anti-aliasing. A unit-amplitude passband tone must come out at
-// unit amplitude for every supported rate pair.
+// unit amplitude for every supported rate pair. The last four pairs need a
+// polyphase filter longer than 16384 coefficients, the fixed size of the
+// resampler's buffers before they were sized from the filter.
 TEST(ResamplerTest, PassbandGainIsUnityAcrossRatePairs) {
   const std::pair<int, int> kRatePairs[] = {
       {44100, 48000},  {48000, 44100},  {88200, 48000}, {96000, 48000},
-      {176400, 48000}, {192000, 48000}, {48000, 96000}, {48000, 32000}};
+      {176400, 48000}, {192000, 48000}, {48000, 96000}, {48000, 32000},
+      {48000, 50360},  {48000, 44056},  {41999, 44100}, {48000, 43210}};
   for (const auto& rates : kRatePairs) {
     const int source_rate = rates.first;
     const int destination_rate = rates.second;
@@ -198,9 +201,9 @@ TEST(ResamplerTest, DownsamplingAttenuatesAboveDestinationNyquist) {
     const double amplitude =
         std::sqrt(2.0 * sum_squares / static_cast<double>(end - begin));
     // 0.02 is roughly -34 dB.
-    EXPECT_LT(amplitude, 0.02) << "aliasing for " << tone_frequency
-                               << " Hz tone, " << source_rate << " -> "
-                               << destination_rate;
+    EXPECT_LT(amplitude, 0.02)
+        << "aliasing for " << tone_frequency << " Hz tone, " << source_rate
+        << " -> " << destination_rate;
   }
 }
 
@@ -215,27 +218,23 @@ TEST(ResamplerTest, ChunkedProcessingMatchesOneShot) {
     size_t chunk_size;
   } kCases[] = {{96000, 48000, 16},  // Chunk shorter than the state buffer.
                 {48000, 96000, 8},   // Ditto, upsampling.
-                {192000, 48000, 160},
-                {44100, 48000, 63},
-                {48000, 44100, 441},
-                {48000, 96000, 100}};
+                {192000, 48000, 160}, {44100, 48000, 63},
+                {48000, 44100, 441},  {48000, 96000, 100}};
   for (const auto& test_case : kCases) {
     const size_t input_length = 4410;
     AudioBuffer input(kNumMonoChannels, input_length);
     GenerateSineWave(kToneFrequency, test_case.source_rate, &input[0]);
 
     Resampler one_shot;
-    one_shot.SetRateAndNumChannels(test_case.source_rate,
-                                   test_case.destination_rate,
-                                   kNumMonoChannels);
+    one_shot.SetRateAndNumChannels(
+        test_case.source_rate, test_case.destination_rate, kNumMonoChannels);
     AudioBuffer one_shot_output(kNumMonoChannels,
                                 one_shot.GetNextOutputLength(input_length));
     one_shot.Process(input, &one_shot_output);
 
     Resampler chunked;
     chunked.SetRateAndNumChannels(test_case.source_rate,
-                                  test_case.destination_rate,
-                                  kNumMonoChannels);
+                                  test_case.destination_rate, kNumMonoChannels);
     std::vector<float> chunked_output;
     size_t offset = 0;
     while (offset < input_length) {
@@ -367,13 +366,17 @@ TEST(ResamplerTest, GetNextOutputLengthTest) {
 }
 
 TEST(Resampler, AreSampleRatesSupportedTest) {
-  const size_t kNumPairs = 6;
-  const int kSourceRates[kNumPairs] = {4000, 16000, 44100, 96000, 41999, 48000};
-  const int kDestRates[kNumPairs] = {96000, 44100, 48000, 32000, 44100, 43210};
-  const bool kExpectedResults[kNumPairs] = {true, true,  true,
-                                            true, false, false};
+  const size_t kNumPairs = 8;
+  const int kSourceRates[kNumPairs] = {4000,  16000, 44100,     96000,
+                                       41999, 48000, 165191039, 165191051};
+  const int kDestRates[kNumPairs] = {96000, 44100, 48000, 32000,
+                                     44100, 43210, 1,     1};
+  const bool kExpectedResults[kNumPairs] = {true, true, true, true,
+                                            true, true, true, false};
 
-  // We generally support only rates with relatively high GCD.
+  // A rate pair is unsupported when a phase of its polyphase filter has more
+  // than 2^31 - 1 coefficients. Downsampling 165191039 Hz to 1 Hz gives
+  // 2147483509 coefficients per phase and 165191051 Hz to 1 Hz 2147483665.
   for (size_t i = 0; i < kNumPairs; ++i) {
     const bool result =
         Resampler::AreSampleRatesSupported(kSourceRates[i], kDestRates[i]);

@@ -158,9 +158,11 @@ static int _set_attribute(renderer_library_context_t *ctx,
         return ck_oar_error_inval;
       }
 
-      if (obr_add_audio_element(obr->api, element_type, profile) < 0) {
+      const int added = obr_add_audio_element(obr->api, element_type, profile);
+      if (added < 0) {
         warn("Failed to add element rendering id %d", params->id);
-        return ck_oar_error_inval;
+        /* -5: an allocation failed; OBR keeps its previous elements. */
+        return added == -5 ? ck_oar_error_nomem : ck_oar_error_inval;
       }
 
     } break;

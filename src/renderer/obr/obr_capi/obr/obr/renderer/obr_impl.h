@@ -36,9 +36,24 @@ namespace obr {
 /*!\brief Implementation of the obr renderer.*/
 class ObrImpl {
  public:
+  /*!\brief Largest supported buffer size per channel, 2^29.
+   *
+   * The FFT size is twice the buffer size rounded up to a power of two, and
+   * pffft takes it as an `int`.
+   */
+  static constexpr int kMaxBufferSizePerChannel = 1 << 29;
+
   /*!\brief Constructor.
    *
-   * \param buffer_size_per_channel Buffer size per channel in samples.
+   * The HRIRs are split into partitions of the buffer size, so below the
+   * HRIR length (256 samples for the direct filters, 8192 for the ambient and
+   * reverberant filters at 48 kHz) each buffer multiplies more partitions
+   * per sample as the buffer size shrinks. At 16 samples and below the FFT
+   * stays at 32 points. Above the HRIR length memory grows linearly with the
+   * buffer size.
+   *
+   * \param buffer_size_per_channel Buffer size per channel in samples, from
+   *        1 to `kMaxBufferSizePerChannel`.
    * \param sampling_rate Sampling rate in Hz.
    */
   ObrImpl(int buffer_size_per_channel, int sampling_rate);

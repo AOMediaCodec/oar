@@ -38,9 +38,6 @@ static const int kDefaultBinauralFiltersAmbisonicOrder = 3;
 // Maximum number of input channels supported by obr.
 static const size_t kMaxSupportedNumInputChannels = 128;
 
-// Maximum allowed size of internal buffers.
-const size_t kMaxSupportedNumFrames = 16384;
-
 // Number of binaural channels.
 static const size_t kNumBinauralChannels = 2;
 

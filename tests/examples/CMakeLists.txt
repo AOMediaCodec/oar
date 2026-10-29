@@ -48,6 +48,12 @@ oar_add_test(test_olr_block_storage)
 target_include_directories(test_olr_block_storage PRIVATE ${PROJECT_SOURCE_DIR})
 oar_add_test(test_binaural_add_remove)
 oar_add_test(test_binaural_mixed_lock)
+oar_add_test(test_samples_per_channel_range)
+
+# Benchmark for doc/samples_per_channel.md; built, not registered with CTest.
+add_executable(benchmark_samples_per_channel benchmark_samples_per_channel.c)
+target_link_libraries(benchmark_samples_per_channel PRIVATE oar_test_common)
+set_property(TARGET benchmark_samples_per_channel PROPERTY C_STANDARD 99)
 
 # The HOA LFE test exercises the 120 Hz LFE low-pass, which is only compiled
 # into the library when OAR_ENABLE_HOA_LFE is ON.
