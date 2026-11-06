@@ -42,8 +42,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "src/renderer/olr/object_audio_renderer/block_processor/processing_block.h"
-#include "src/renderer/olr/object_audio_renderer/object_based_audio_renderer.h"
+#include "processing_block.h"
+#include "object_based_audio_renderer.h"
 #include "test_framework.h"
 
 #define BLOCK 256

@@ -4,11 +4,11 @@ package(default_visibility = ["//src:__subpackages__"])
 
 cc_library(
     name = "ae_rdr",
-    hdrs = ["ae_rdr.h"],
     srcs = [
         "h2m_rdr.c",
         "m2m_rdr.c",
     ],
+    hdrs = ["ae_rdr.h"],
     # ae_rdr.h defaults DISABLE_LFE_HOA to 1. Defining it to 0 compiles in the
     # HOA-to-loudspeakers LFE path, as CMake's OAR_ENABLE_HOA_LFE does.
     # `defines` rather than `local_defines` so ear.c, which also tests the

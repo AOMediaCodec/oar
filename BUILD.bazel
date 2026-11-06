@@ -1,7 +1,6 @@
 # Open Audio Renderer Library (oar).
 
 load("@rules_cc//cc:defs.bzl", "cc_library")
-
 # [internal] load license.bzl
 
 # [internal] license
