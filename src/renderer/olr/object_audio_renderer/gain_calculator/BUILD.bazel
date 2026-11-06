@@ -7,8 +7,8 @@ cc_library(
     srcs = ["convex_hull.c"],
     hdrs = ["convex_hull.h"],
     deps = [
-        "//src/common",
         "//src:oar_config",
+        "//src/common",
     ],
 )
 
@@ -33,10 +33,10 @@ cc_library(
     strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
     deps = [
         ":convex_hull",
-        "//src/common",
         "//src:oar_config",
+        "//src/common",
         "//src/renderer/olr/object_audio_renderer:layout",
-        "//src/renderer/olr/object_audio_renderer:utils",
         "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
+        "//src/renderer/olr/object_audio_renderer:utils",
     ],
 )

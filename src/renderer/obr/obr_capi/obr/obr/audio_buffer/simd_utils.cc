@@ -881,7 +881,7 @@ void Int16FromFloat(size_t length, const float* input, int16_t* output) {
 
   // The remainder.
   float temp_float;
-  for (size_t i = length - GetLeftoverSamples(length); i < length; ++i) {
+  for (size_t i = length - leftover_samples; i < length; ++i) {
     temp_float = input[i] * kInt16FromFloat;
     temp_float = std::min(kInt16Max, std::max(kInt16Min, temp_float));
     output[i] = static_cast<int16_t>(temp_float);

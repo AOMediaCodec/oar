@@ -43,7 +43,7 @@ cc_library(
         ":renderer_library_api",
         "//include",
         "//src/common",
-    ]
+    ],
 )
 
 cc_library(
@@ -89,7 +89,7 @@ cc_library(
     hdrs = ["renderer_library_utils.h"],
     strip_include_prefix = "//src/renderer",
     deps = [
+        ":renderer_library_api",
         "//include",
-        ":renderer_library_api"
     ],
 )

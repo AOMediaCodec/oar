@@ -22,4 +22,3 @@ cc_library(
         "//src/common",
     ],
 )
-
