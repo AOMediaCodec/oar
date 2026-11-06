@@ -24,5 +24,5 @@ cc_library(
         "definitions.h",
         "dep_wavwriter.h",
     ],
-    strip_include_prefix = "//src/common",
+    strip_include_prefix = ":common",
 )

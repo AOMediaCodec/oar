@@ -7,7 +7,7 @@ cc_library(
     hdrs = [
         "object_based_audio_renderer.h",
     ],
-    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    strip_include_prefix = ":object_audio_renderer",
     # test_olr_render_offsets calls the object audio renderer directly.
     visibility = [
         "//src:__subpackages__",
@@ -24,15 +24,15 @@ cc_library(
         "object_based_audio_renderer.c",
     ],
     deps = [
+        ":layout",
         ":object_based_audio_renderer_header",
         ":renderer",
-        ":layout",
         ":utils",
-        "//src/common",
         "//src:oar_config",
-        "//src/renderer/olr/object_audio_renderer/gain_calculator:convex_hull",
+        "//src/common",
         "//src/renderer/olr/object_audio_renderer/block_processor:block_processing_channel",
-        "//src/renderer/olr/object_audio_renderer/gain_calculator:gain_calculator",
+        "//src/renderer/olr/object_audio_renderer/gain_calculator",
+        "//src/renderer/olr/object_audio_renderer/gain_calculator:convex_hull",
     ],
     alwayslink = True,
 )
@@ -45,12 +45,12 @@ cc_library(
     hdrs = [
         "layout.h",
     ],
-    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    strip_include_prefix = ":object_audio_renderer",
     deps = [
         ":object_based_audio_renderer_header",
         ":utils",
-        "//src/common",
         "//src:oar_config",
+        "//src/common",
     ],
 )
 
@@ -63,8 +63,8 @@ cc_library(
         "renderer.h",
     ],
     deps = [
-        ":object_based_audio_renderer_header",
         ":layout",
+        ":object_based_audio_renderer_header",
         ":utils",
         "//src/common",
         "//src/renderer/olr/object_audio_renderer/block_processor:block_processing_channel",
@@ -82,9 +82,9 @@ cc_library(
         "numc.h",
         "utils.h",
     ],
-    strip_include_prefix = "//src/renderer/olr/object_audio_renderer",
+    strip_include_prefix = ":object_audio_renderer",
     deps = [
-        "//src/common",
         "//src:oar_config",
+        "//src/common",
     ],
 )

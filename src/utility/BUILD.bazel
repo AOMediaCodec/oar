@@ -6,7 +6,7 @@ cc_library(
     name = "utility",
     srcs = ["animation.c"],
     hdrs = ["animated.h"],
-    strip_include_prefix = "//src/utility",
+    strip_include_prefix = ":utility",
     deps = [
         "//include",
         "//src:oar_utils",

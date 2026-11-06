@@ -14,6 +14,6 @@ filegroup(
 cc_library(
     name = "include",
     hdrs = [":header_files"],
-    strip_include_prefix = "//include",
+    strip_include_prefix = ":include",
     visibility = ["//visibility:public"],
 )
