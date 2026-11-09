@@ -8,6 +8,8 @@ on:
 
 jobs:
   build-and-test:
+    # Branch protection on main selects required checks by this name.
+    name: CMake (${{ matrix.os }}, ${{ matrix.library }})
     strategy:
       fail-fast: false
       matrix:
