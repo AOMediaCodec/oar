@@ -22,6 +22,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <exception>
+#include <new>
 
 #include "obr/renderer/obr_impl.h"
 using namespace obr;
@@ -57,8 +58,10 @@ inline ObrImpl *cast_(obr_handle op) {
   return priv ? priv->obr.get() : nullptr;
 }
 
+// Returns NULL when the allocation fails, in builds with and without
+// exceptions, instead of throwing std::bad_alloc across the C API.
 CObrApiPriv *ObrApiPrivCreate() {
-  CObrApiPriv *instance = new CObrApiPriv();
+  CObrApiPriv *instance = new (std::nothrow) CObrApiPriv();
   return instance;
 }
 
@@ -76,6 +79,7 @@ obr_handle obr_create(int buffer_size_per_channel, int sampling_rate) {
 
   obr_handle handle = static_cast<obr_handle>(ObrApiPrivCreate());
   auto priv = static_cast<CObrApiPriv *>(handle);
+  if (!priv) return NULL;
 
   if (!CallWithoutThrowing([&] {
         priv->obr =
