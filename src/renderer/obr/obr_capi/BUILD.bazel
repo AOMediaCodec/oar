@@ -13,5 +13,5 @@ cc_library(
     }),
     deps = [
         "@obr//obr/renderer:obr_impl",
-    ]
+    ],
 )

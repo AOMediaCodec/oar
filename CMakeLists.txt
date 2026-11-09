@@ -110,6 +110,7 @@ include_directories(
     src/renderer/ear
     src/renderer/olr
     src/renderer/olr/object_audio_renderer
+    src/renderer/olr/object_audio_renderer/block_processor
     )
 
 if(OAR_BUILD_SHARED_LIBRARY)

@@ -17,6 +17,6 @@ cc_library(
     deps = [
         "//src/common",
         "//src/renderer:renderer_library_api",
-		"//src/renderer/obr/obr_capi",
-	],
+        "//src/renderer/obr/obr_capi",
+    ],
 )
