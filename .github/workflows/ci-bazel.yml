@@ -8,6 +8,8 @@ on:
 
 jobs:
   build-and-test:
+    # Branch protection on main selects required checks by this name.
+    name: Bazel (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
