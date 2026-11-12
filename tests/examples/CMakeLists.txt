@@ -44,8 +44,12 @@ target_include_directories(test_olr_render_offsets PRIVATE
 oar_add_test(test_render_scratch)
 oar_add_test(test_metadata_reuse)
 oar_add_test(test_olr_block_storage)
-# Includes internal headers by their repository paths, as in Bazel.
-target_include_directories(test_olr_block_storage PRIVATE ${PROJECT_SOURCE_DIR})
+# Calls the object audio renderer and block processor directly, through its
+# internal header.
+target_include_directories(test_olr_block_storage PRIVATE
+  ${PROJECT_SOURCE_DIR}/src/renderer/olr/object_audio_renderer/block_processor
+  ${PROJECT_SOURCE_DIR}/src
+  ${PROJECT_SOURCE_DIR}/src/common)
 oar_add_test(test_binaural_add_remove)
 oar_add_test(test_binaural_mixed_lock)
 
