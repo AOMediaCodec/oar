@@ -9,7 +9,7 @@ def _pffft_ext_impl(mctx):
         # resolves against the main repository rather than against the module
         # this file belongs to, so it breaks as soon as obr is consumed as a
         # dependency instead of built on its own.
-        build_file = Label("@obr//third_party:pffft.BUILD"),
+        build_file = Label("@obr//third_party:pffft.BUILD.bazel"),
     )
 
 pffft_ext = module_extension(implementation = _pffft_ext_impl)

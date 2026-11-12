@@ -1,10 +1,9 @@
-load("@bazel_skylib//lib:selects.bzl", "selects")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@bazel_skylib//lib:selects.bzl", "selects")
 
 package(default_visibility = [
-        "//src:__subpackages__",
-    ]
-)
+    "//src:__subpackages__",
+])
 
 # The CMake options mirrored below accept boolean constants in several
 # spellings (ON/OFF, TRUE/FALSE, YES/NO), and `--define` silently ignores
@@ -78,7 +77,7 @@ cc_library(
     strip_include_prefix = "//src",
     deps = [
         "//src/common",
-    ]
+    ],
 )
 
 cc_library(
@@ -86,12 +85,13 @@ cc_library(
     srcs = [
         "oar.c",
     ],
-    strip_include_prefix = "//src",
     # Defines `__binauralizer__` by default.
     defines = select({
         ":disable_binauralizer": [],
         "//conditions:default": ["__binauralizer__"],
     }),
+    strip_include_prefix = "//src",
+    visibility = ["//:__pkg__"],
     # Depends on obr by default.
     deps = [
         ":oar_utils",
@@ -111,7 +111,6 @@ cc_library(
         ":disable_binauralizer": [],
         "//conditions:default": ["//src/renderer/obr"],
     }),
-    visibility = ["//:__pkg__"],
     alwayslink = True,
 )
 

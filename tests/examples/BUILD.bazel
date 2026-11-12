@@ -1,4 +1,4 @@
-load("@rules_cc//cc:defs.bzl", "cc_test", "cc_library")
+load("@rules_cc//cc:defs.bzl", "cc_library", "cc_test")
 
 # Shared test infrastructure: test_framework + test_helpers
 cc_library(
@@ -160,6 +160,8 @@ cc_test(
     deps = [
         ":oar_test_common",
         "//:oar",
+        "//src/renderer/olr/object_audio_renderer:object_based_audio_renderer_header",
+        "//src/renderer/olr/object_audio_renderer/block_processor:processing_block",
     ],
 )
 
